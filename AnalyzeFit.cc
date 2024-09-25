@@ -128,6 +128,7 @@ void PrintFinalMeans(const FitData &data, const vector<TString> &layer, const ve
     }
 }
 
+
 void SavePlots(FitData &data, const vector<TString> &layer, const vector<TString> &bar,
                const TString &type, int markerColor) {
     if (data.energies.empty()) return;
@@ -137,6 +138,12 @@ void SavePlots(FitData &data, const vector<TString> &layer, const vector<TString
     gSystem->mkdir(directory, true);  // 'true' allows creating nested directories if needed
 
     TCanvas *canvas = new TCanvas("canvas", "Fit Results", 800, 600);
+
+    // Adjust canvas margins to avoid label cropping
+    canvas->SetLeftMargin(0.15);
+    canvas->SetRightMargin(0.05);
+    canvas->SetBottomMargin(0.15);
+    canvas->SetTopMargin(0.1);
 
     for (const auto &entry : data.validCombinations) {
         Double_t beamEnergy = entry.first;
@@ -164,7 +171,18 @@ void SavePlots(FitData &data, const vector<TString> &layer, const vector<TString
                 graph->SetMarkerColor(markerColor);
                 graph->GetXaxis()->SetTitle("Primary beam energy [MeV]");
                 graph->GetYaxis()->SetTitle("Mean charge");
+
+                // Adjust the label sizes to ensure they fit within the canvas
+                graph->GetXaxis()->SetTitleSize(0.05);
+                graph->GetYaxis()->SetTitleSize(0.05);
+                graph->GetXaxis()->SetLabelSize(0.04);
+                graph->GetYaxis()->SetLabelSize(0.04);
+
+                // Draw the graph
                 graph->Draw("AP");
+
+                // Redraw the axis to make sure the labels aren't cropped
+                canvas->RedrawAxis();
 
                 // Save the plot inside the directory
                 TString outputFileName = directory + "/" + TString::Format("plot_%s_Layer%d_%s.png", type.Data(), i, bar[j].Data());
@@ -175,6 +193,7 @@ void SavePlots(FitData &data, const vector<TString> &layer, const vector<TString
     }
     delete canvas;
 }
+
 
 void AnalyzeFit(const vector<int> &fileNumbers) {
     // Define file names and paths
