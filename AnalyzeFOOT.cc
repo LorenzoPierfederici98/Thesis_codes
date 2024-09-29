@@ -293,6 +293,13 @@ void AnalyzeFOOT(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t ne
         TimeA_perBar[layer][bar]->Fill(timeA);
         TimeB_perBar[layer][bar]->Fill(timeB);
         Time_perBar[layer][bar]->Fill(timeBar);
+
+        ChargeA_perBar[layer][bar]->GetXaxis()->SetRangeUser(ChargeA_perBar[layer][bar]->GetBinLowEdge(ChargeA_perBar[layer][bar]->FindFirstBinAbove()), 
+                                   ChargeA_perBar[layer][bar]->GetBinLowEdge(ChargeA_perBar[layer][bar]->FindLastBinAbove() + 1));
+        ChargeB_perBar[layer][bar]->GetXaxis()->SetRangeUser(ChargeB_perBar[layer][bar]->GetBinLowEdge(ChargeB_perBar[layer][bar]->FindFirstBinAbove()), 
+                                   ChargeB_perBar[layer][bar]->GetBinLowEdge(ChargeB_perBar[layer][bar]->FindLastBinAbove() + 1));
+        Charge_perBar[layer][bar]->GetXaxis()->SetRangeUser(Charge_perBar[layer][bar]->GetBinLowEdge(Charge_perBar[layer][bar]->FindFirstBinAbove()), 
+                                   Charge_perBar[layer][bar]->GetBinLowEdge(Charge_perBar[layer][bar]->FindLastBinAbove() + 1));
       }
 
       if (layer == (Int_t)LayerX && bar >= CentralBarsID[0] && bar <= CentralBarsID[2])
@@ -530,9 +537,9 @@ void BookHistograms()
     for (int ibar = 0; ibar < (int)nBarsPerLayer; ibar++)
     {
       // dE_vs_tof_perBar[ilay][ibar] = new TH2D(Form("dE_vs_tof_%s_bar%d",LayerName[(TLayer)ilay].data(),ibar),Form("dE_vs_tof_%s_bar%d",LayerName[(TLayer)ilay].data(),ibar),25000,5.,30.,1200,0.,120.);  // 1~ps/bin - 0.1 MeV/bin
-      ChargeA_perBar[ilay][ibar] = new TH1D(Form("Charge_ChA_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Charge_ChA_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 120, -1., 6.);
-      ChargeB_perBar[ilay][ibar] = new TH1D(Form("Charge_ChB_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Charge_ChB_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 120, -1., 6.);
-      Charge_perBar[ilay][ibar] = new TH1D(Form("Charge_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Charge_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 120, -1., 6.);
+      ChargeA_perBar[ilay][ibar] = new TH1D(Form("Charge_ChA_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Charge_ChA_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 120, -1., 9.);
+      ChargeB_perBar[ilay][ibar] = new TH1D(Form("Charge_ChB_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Charge_ChB_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 120, -1., 9.);
+      Charge_perBar[ilay][ibar] = new TH1D(Form("Charge_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Charge_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 120, -1., 9.);
       TimeA_perBar[ilay][ibar] = new TH1D(Form("Time_ChA_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Time_ChA_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 150, 50., 200.);
       TimeB_perBar[ilay][ibar] = new TH1D(Form("Time_ChB_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Time_ChB_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 150, 50., 200.);
       Time_perBar[ilay][ibar] = new TH1D(Form("Time_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Time_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 150, 50., 200.);
