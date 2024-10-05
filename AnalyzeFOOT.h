@@ -20,6 +20,8 @@
 #include <TH1.h>
 #include <TROOT.h>
 #include <TKey.h>
+#include <TSpectrum.h>
+
 
 #include "TAGcampaignManager.hxx"
 #include "TAGactTreeReader.hxx"
@@ -157,7 +159,8 @@ Bool_t calibTw            = false;
 Bool_t isTwScan           = true;
 Bool_t readBinTwCalibFile = false;
 
-enum{kCharges=8,kLayers=2,kBars=20};
+enum{kCharges=8,kLayers=2,kBars=20};  //TW
+enum{kModules=7, kCrysPerModule=9};  //Calorimeter
 // enum{kCharges=8,kLayers=2,kCentralBars=3};
 enum{kVTreg=2,kTWreg=4};
 enum FlukaVar {kPrimaryID=0,kNeutronFlukaId=8};
@@ -193,12 +196,15 @@ TH1D *Charge_perBar[kLayers][nBarsPerLayer];  //sqrt(QA*QB)
 TH1D *TimeA_perBar[kLayers][nBarsPerLayer];
 TH1D *TimeB_perBar[kLayers][nBarsPerLayer];
 TH1D *Time_perBar[kLayers][nBarsPerLayer];  //0.5*(TA + TB)
+TH1D *Charge_Calo_total;  //charge in all calo
+TH1D *Charge_Calo_crystal[kModules * kCrysPerModule];  //charge per crystal id
 
 // TH2D *dE_vs_tof_perBar[kLayers][kBars];
 TH1D *heloss_all;
 // TH1D *heloss[kTrigsN];;
 TH2D *hTwPos[kLayers];
 TH2D *hTwMapPos;
+TH2D *hCalMapPos[kModules];  //2D histogram of x, y positions in the calorimeter
 TH2D *hTwMapPos_TWpntBin;
 TH2D *hTwMapPos_TWpnt;
 TH2D *hTwMapPos_TWpnt_Z[kCharges];

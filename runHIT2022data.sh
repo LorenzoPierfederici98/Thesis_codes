@@ -1,11 +1,16 @@
-#!/bin/bash
+ola #!/bin/bash
 # how to run:
 # running with command (for example):
 #./runHIT2022data.sh
 
 echo "$@"
 
-runNumber='4742 4743 4744 4745 4828 4895 4896 4897 4898 4899 4900'
+runNumber='4742'
+#Runs without target:
+#runNumber='4742 4743 4744 4745 4766 4801 4828 4830 4837 '
+#Runs in local:
+#runNumber='4742 4743 4744 4745 4828 4895 4896 4897 4898 4899 4900'
+#Runs total:
 #runNumber='4742 4743 4744 4745 4766 4801 4828 4830 4837 4895 4896 4897 4898 4899 4900 4901 4902 4903 4904 4905 4906'
 
 echo Running Macro \in Batch

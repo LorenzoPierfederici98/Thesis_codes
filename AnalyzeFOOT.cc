@@ -199,6 +199,7 @@ void AnalyzeFOOT(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t ne
 
     Int_t nHitsX = twNtuHit->GetHitN((Int_t)LayerX);
     Int_t nHitsY = twNtuHit->GetHitN((Int_t)LayerY);
+    
     if (debug)
       cout << " TWhits X::" << nHitsX << " Y::" << nHitsY << endl;
 
@@ -260,20 +261,23 @@ void AnalyzeFOOT(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t ne
     {
 
       TATWhit *hit = twNtuHit->GetHit(ihit);
+
       if (!hit)
         continue;
 
       Int_t bar = hit->GetBar();
       Int_t layer = hit->GetLayer();
+      //Int_t crystal_id = hit_ca->GetCrystalId();
       Int_t NmcTrk = hit->GetMcTracksN();
       Double_t eloss = hit->GetEnergyLoss();
       Double_t tof = hit->GetToF();
       Int_t Z = hit->GetChargeZ();
       Double_t chargeA = hit->GetChargeChA();
       Double_t chargeB = hit->GetChargeChB();
-      if (chargeA * chargeB < 0){
-        printf("Invalid sqrt\n");
-      }
+      if (chargeA < 0)
+        chargeA = 0;
+      if (chargeB < 0)
+        chargeB = 0;
       Double_t chargeBar = sqrt(chargeA * chargeB);
       Double_t timeA = hit->GetTimeChA();
       Double_t timeB = hit->GetTimeChB();
@@ -300,6 +304,13 @@ void AnalyzeFOOT(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t ne
                                    ChargeB_perBar[layer][bar]->GetBinLowEdge(ChargeB_perBar[layer][bar]->FindLastBinAbove() + 1));
         Charge_perBar[layer][bar]->GetXaxis()->SetRangeUser(Charge_perBar[layer][bar]->GetBinLowEdge(Charge_perBar[layer][bar]->FindFirstBinAbove()), 
                                    Charge_perBar[layer][bar]->GetBinLowEdge(Charge_perBar[layer][bar]->FindLastBinAbove() + 1));
+
+        TimeA_perBar[layer][bar]->GetXaxis()->SetRangeUser(TimeA_perBar[layer][bar]->GetBinLowEdge(TimeA_perBar[layer][bar]->FindFirstBinAbove()), 
+                                   TimeA_perBar[layer][bar]->GetBinLowEdge(TimeA_perBar[layer][bar]->FindLastBinAbove() + 1));
+        TimeB_perBar[layer][bar]->GetXaxis()->SetRangeUser(TimeB_perBar[layer][bar]->GetBinLowEdge(TimeB_perBar[layer][bar]->FindFirstBinAbove()), 
+                                   TimeB_perBar[layer][bar]->GetBinLowEdge(TimeB_perBar[layer][bar]->FindLastBinAbove() + 1));
+        Time_perBar[layer][bar]->GetXaxis()->SetRangeUser(Time_perBar[layer][bar]->GetBinLowEdge(Time_perBar[layer][bar]->FindFirstBinAbove()), 
+                                   Time_perBar[layer][bar]->GetBinLowEdge(Time_perBar[layer][bar]->FindLastBinAbove() + 1));
       }
 
       if (layer == (Int_t)LayerX && bar >= CentralBarsID[0] && bar <= CentralBarsID[2])
@@ -394,7 +405,7 @@ void AnalyzeFOOT(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t ne
           eloss = hitY->GetEnergyLoss();
 
         Double_t tof = twpnt->GetMeanTof();
-        // TVector3 glPntPos = twpnt->GetPositionGlb();
+        // TVector3 glPntPos = twpnt->GetPositionGlb(); 
 
         TATWhit *hit, *other_hit;
         if (twpnt->GetMainLayer() == (Int_t)LayerX)
@@ -422,6 +433,28 @@ void AnalyzeFOOT(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t ne
         }
       }
     }
+
+    Int_t nHitsCalo = caNtuHit->GetHitsN();  //number of hits in calo
+
+    for(int ihit=0; ihit < nHitsCalo; ihit++){
+
+      TACAhit *hit_ca = caNtuHit->GetHit(ihit);
+      if(!hit_ca)
+        continue;
+
+      Int_t crystal_id = hit_ca->GetCrystalId();
+      Double_t charge_calo = hit_ca->GetCharge();
+      Int_t ModuleID = crystal_id / kCrysPerModule;
+      TVector3 CaloPosition = hit_ca->GetPosition();
+      Charge_Calo_total->Fill(charge_calo);
+      Charge_Calo_total->GetXaxis()->SetRangeUser(Charge_Calo_total->GetBinLowEdge(Charge_Calo_total->FindFirstBinAbove()), 
+                                   Charge_Calo_total->GetBinLowEdge(Charge_Calo_total->FindLastBinAbove() + 1));
+      Charge_Calo_crystal[crystal_id]->Fill(charge_calo);
+      hCalMapPos[ModuleID]->Fill(CaloPosition.X(), CaloPosition.Y());
+      cout << "x: " << CaloPosition.X() << " y: " << CaloPosition.Y() << " ID: " << crystal_id << " module: " << ModuleID << endl;
+      cout << "z: " << CaloPosition.Z() << endl;
+    }
+    
   } // close for loop over events
 
   gTAGroot.EndEventLoop();
@@ -436,7 +469,7 @@ void AnalyzeFOOT(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t ne
   //     t->Write(Form("FitResult_Time_layer%d_bar%d", ilay, ibar));
   //   }
   // }
-  const Double_t fractionThreshold = 0.01; // Fraction of total entries required (e.g., 0.1 for 10%)
+  const Double_t fractionThreshold = 0.009; // Fraction of total entries required (e.g., 0.1 for 10%)
   Int_t fitThreshold = static_cast<Int_t>(fractionThreshold * nentries);
 
   for (int ilay = 0; ilay < kLayers; ilay++)
@@ -450,7 +483,7 @@ void AnalyzeFOOT(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t ne
       // Check if Charge_perBar histogram has sufficient entries
       if (chargeEntries >= fitThreshold)
       {
-        TFitResultPtr c = Charge_perBar[ilay][ibar]->Fit("gaus", "QS");
+        TFitResultPtr c = Charge_perBar[ilay][ibar]->Fit("gaus", "QS", " ", 2., 10.);
 
         if (c->IsValid())
         {
@@ -463,19 +496,19 @@ void AnalyzeFOOT(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t ne
       }
 
       // Check if Time_perBar histogram has sufficient entries
-      if (timeEntries >= fitThreshold)
-      {
-        TFitResultPtr t = Time_perBar[ilay][ibar]->Fit("gaus", "QS");
+      // if (timeEntries >= fitThreshold)
+      // {
+      //   TFitResultPtr t = Time_perBar[ilay][ibar]->Fit("gaus", "QS");
 
-        if (t->IsValid())
-        {
-          t->Write(Form("FitResult_Time_layer%d_bar%d", ilay, ibar));
-        }
-        else
-        {
-          std::cerr << "Fit failed for Time in layer " << ilay << ", bar " << ibar << std::endl;
-        }
-      }
+      //   if (t->IsValid())
+      //   {
+      //     t->Write(Form("FitResult_Time_layer%d_bar%d", ilay, ibar));
+      //   }
+      //   else
+      //   {
+      //     std::cerr << "Fit failed for Time in layer " << ilay << ", bar " << ibar << std::endl;
+      //   }
+      // }
     }
   }
 
@@ -529,6 +562,17 @@ void BookHistograms()
   // fpHisStripMap = new TH1F(Form("msStripMap%d", 4+1), Form("MSD - strip map for sensor %d", i+1), pGeoMap->GetStripsN(), 0, msdparGeo->GetStripsN());
   // AddHistogram(fpHisStripMap);
 
+  Charge_Calo_total = new TH1D(Form("Charge_Calo"), Form("Charge_Calo"), 500, 0., 2.);
+
+  for(int icrystal=0; icrystal < kModules*kCrysPerModule; icrystal++)
+  {
+    Charge_Calo_crystal[icrystal] = new TH1D(Form("Charge_Calo_crystalId_%d", icrystal), Form("Charge_Calo_crystalID_%d", icrystal), 120, -1., 5.);
+  }
+  for(int imodule=0; imodule < kModules; imodule++)
+  {
+    hCalMapPos[imodule] = new TH2D(Form("hCalMapPos_module_%d", imodule), Form("hCalMapPos_module_%d", imodule), 20, -15., 15., 20, -15., 15.);
+  }
+
   for (int ilay = 0; ilay < kLayers; ilay++)
   {
 
@@ -537,12 +581,12 @@ void BookHistograms()
     for (int ibar = 0; ibar < (int)nBarsPerLayer; ibar++)
     {
       // dE_vs_tof_perBar[ilay][ibar] = new TH2D(Form("dE_vs_tof_%s_bar%d",LayerName[(TLayer)ilay].data(),ibar),Form("dE_vs_tof_%s_bar%d",LayerName[(TLayer)ilay].data(),ibar),25000,5.,30.,1200,0.,120.);  // 1~ps/bin - 0.1 MeV/bin
-      ChargeA_perBar[ilay][ibar] = new TH1D(Form("Charge_ChA_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Charge_ChA_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 120, -1., 9.);
-      ChargeB_perBar[ilay][ibar] = new TH1D(Form("Charge_ChB_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Charge_ChB_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 120, -1., 9.);
-      Charge_perBar[ilay][ibar] = new TH1D(Form("Charge_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Charge_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 120, -1., 9.);
-      TimeA_perBar[ilay][ibar] = new TH1D(Form("Time_ChA_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Time_ChA_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 150, 50., 200.);
-      TimeB_perBar[ilay][ibar] = new TH1D(Form("Time_ChB_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Time_ChB_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 150, 50., 200.);
-      Time_perBar[ilay][ibar] = new TH1D(Form("Time_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Time_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 150, 50., 200.);
+      ChargeA_perBar[ilay][ibar] = new TH1D(Form("Charge_ChA_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Charge_ChA_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 120, -2., 12.);
+      ChargeB_perBar[ilay][ibar] = new TH1D(Form("Charge_ChB_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Charge_ChB_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 120, -2., 12.);
+      Charge_perBar[ilay][ibar] = new TH1D(Form("Charge_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Charge_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 120, -2., 12.);
+      TimeA_perBar[ilay][ibar] = new TH1D(Form("Time_ChA_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Time_ChA_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 150, -100., 400.);
+      TimeB_perBar[ilay][ibar] = new TH1D(Form("Time_ChB_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Time_ChB_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 150, -100., 400.);
+      Time_perBar[ilay][ibar] = new TH1D(Form("Time_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Time_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 150, -100., 400.);
     }
     if (ilay == (Int_t)LayerX)
       hTwPos[ilay] = new TH2D(Form("hTwPos_%s", LayerName[(TLayer)ilay].data()), Form("hTwPos_%s", LayerName[(TLayer)ilay].data()), 220, -22., 22., 20, -20., 20.); // 2 mm/bin - 2 cm/bin
