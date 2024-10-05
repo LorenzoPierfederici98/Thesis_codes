@@ -1,3 +1,7 @@
+//Analyzes the charge fit results for every bar of the TW and plots them against
+//the beam energy. If more than one charge value is found for a certain energy a mean is computed.
+//To be run with e.g.  root -l -q 'AnalyzeFit.cc({4742, 4743, 4743, 4744, 4896, 4897, 4898, 4899, 4900})' 
+
 #include <vector>
 #include <TString.h>
 #include <TFile.h>
@@ -140,8 +144,8 @@ void SavePlots(FitData &data, const vector<TString> &layer, const vector<TString
     TCanvas *canvas = new TCanvas("canvas", "Fit Results", 800, 600);
 
     // Adjust canvas margins to avoid label cropping
-    canvas->SetLeftMargin(0.15);
-    canvas->SetRightMargin(0.05);
+    canvas->SetLeftMargin(0.35);
+    canvas->SetRightMargin(0.25);
     canvas->SetBottomMargin(0.15);
     canvas->SetTopMargin(0.1);
 
