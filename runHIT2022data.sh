@@ -1,4 +1,4 @@
-ola #!/bin/bash
+#!/bin/bash
 # how to run:
 # running with command (for example):
 #./runHIT2022data.sh
