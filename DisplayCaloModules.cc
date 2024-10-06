@@ -9,7 +9,7 @@
 
 void DisplayCaloModules(const vector<int> &fileNumbers) {
     int nModules = 7;  // Number of modules (adjust if needed)
-    gStyle->SetOptStat(11);  // Display just histo's name and # of entries
+    //gStyle->SetOptStat(11);  // Display just histo's name and # of entries
     gStyle->SetStatX(0.3);  // Stats box on the left
 
     for(int runNumber : fileNumbers)
@@ -32,6 +32,8 @@ void DisplayCaloModules(const vector<int> &fileNumbers) {
         for (int moduleID = 0; moduleID < nModules; ++moduleID) {
             // Move to the appropriate pad (one pad per module)
             c1->cd(moduleID + 1);  // Go to the (moduleID + 1)-th pad
+            gPad->SetRightMargin(0.2);
+            gStyle->SetPalette(1);
 
             // Retrieve the 2D histogram for the current module
             TH2D* hCalMapPos = (TH2D*)inFile->Get(Form("hCalMapPos_module_%d", moduleID));
@@ -46,7 +48,9 @@ void DisplayCaloModules(const vector<int> &fileNumbers) {
             // Only draw if there are entries
             if (entries > 0) {
                 hCalMapPos->Draw("COLZ TEXT");  // Draw histogram with color palette
-                c1->SetRightMargin(0.5);
+                hCalMapPos->GetXaxis()->SetTitle("X");
+                hCalMapPos->GetYaxis()->SetTitle("Y");
+                gPad->SetLogz(1);
             } else {
                 std::cout << "Warning: Histogram for module " << moduleID << " is empty." << std::endl;
             }
