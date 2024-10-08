@@ -9,7 +9,9 @@
 
 void DisplayCaloModules(const vector<int> &fileNumbers) {
     int nModules = 7;  // Number of modules (adjust if needed)
-    //gStyle->SetOptStat(11);  // Display just histo's name and # of entries
+    //int modules[7] = {4, 5, 3, 6, 2, 7, 1};
+    int modules[7] = {7, 6, 5, 4, 3, 2, 1};
+    gStyle->SetOptStat(11);  // Display just histo's name and # of entries
     gStyle->SetStatX(0.3);  // Stats box on the left
 
     for(int runNumber : fileNumbers)
@@ -25,13 +27,14 @@ void DisplayCaloModules(const vector<int> &fileNumbers) {
         }
 
         // Create a canvas and divide it into subplots
-        TCanvas* c1 = new TCanvas("c1", Form("Display Run %d", runNumber), 2000, 800);
-        c1->Divide(4, 2);  // 2 rows and 4 columns
+        TCanvas* c1 = new TCanvas("c1", Form("Display Run %d", runNumber), 2500, 1500);
+        c1->Divide(6, 2);  // 2 rows and 6 columns
 
         // Loop over all modules and display their respective histograms in subplots
-        for (int moduleID = 0; moduleID < nModules; ++moduleID) {
+        int index = 0;
+        for (int moduleID : modules) {
             // Move to the appropriate pad (one pad per module)
-            c1->cd(moduleID + 1);  // Go to the (moduleID + 1)-th pad
+            c1->cd(index + 1);  // Go to the (moduleID + 1)-th pad
             gPad->SetRightMargin(0.2);
             gStyle->SetPalette(1);
 
@@ -55,6 +58,7 @@ void DisplayCaloModules(const vector<int> &fileNumbers) {
                 std::cout << "Warning: Histogram for module " << moduleID << " is empty." << std::endl;
             }
             hCalMapPos->SetDirectory(0);
+            index += 1;
         }
 
         c1->cd();

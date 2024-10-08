@@ -451,8 +451,9 @@ void AnalyzeFOOT(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t ne
                                    Charge_Calo_total->GetBinLowEdge(Charge_Calo_total->FindLastBinAbove() + 1));
       Charge_Calo_crystal[crystal_id]->Fill(charge_calo);
       hCalMapPos[ModuleID]->Fill(CaloPosition.X(), CaloPosition.Y());
-      cout << "x: " << CaloPosition.X() << " y: " << CaloPosition.Y() << " ID: " << crystal_id << " module: " << ModuleID << endl;
-      cout << "z: " << CaloPosition.Z() << endl;
+      if(ModuleID==1)
+        cout << "x: " << CaloPosition.X() << " y: " << CaloPosition.Y() << " z: " << CaloPosition.Z() << " ID: " << crystal_id << " module: " << ModuleID << endl;
+      Charge_Calo_Module[ModuleID]->Fill(charge_calo);
     }
     
   } // close for loop over events
@@ -561,16 +562,18 @@ void BookHistograms()
 
   // fpHisStripMap = new TH1F(Form("msStripMap%d", 4+1), Form("MSD - strip map for sensor %d", i+1), pGeoMap->GetStripsN(), 0, msdparGeo->GetStripsN());
   // AddHistogram(fpHisStripMap);
+  int modules[7] = {4, 5, 3, 6, 2, 7, 1};  // module enumeration following the excel file
 
-  Charge_Calo_total = new TH1D(Form("Charge_Calo"), Form("Charge_Calo"), 500, 0., 2.);
+  Charge_Calo_total = new TH1D(Form("Charge_Calo"), Form("Charge_Calo"), 500, 0., 1.5);
 
   for(int icrystal=0; icrystal < kModules*kCrysPerModule; icrystal++)
   {
-    Charge_Calo_crystal[icrystal] = new TH1D(Form("Charge_Calo_crystalId_%d", icrystal), Form("Charge_Calo_crystalID_%d", icrystal), 120, -1., 5.);
+    Charge_Calo_crystal[icrystal] = new TH1D(Form("Charge_Calo_crystalId_%d", icrystal), Form("Charge_Calo_crystalID_%d", icrystal), 100, -0.2, 1.);
   }
   for(int imodule=0; imodule < kModules; imodule++)
   {
-    hCalMapPos[imodule] = new TH2D(Form("hCalMapPos_module_%d", imodule), Form("hCalMapPos_module_%d", imodule), 20, -15., 15., 20, -15., 15.);
+    hCalMapPos[imodule] = new TH2D(Form("hCalMapPos_module_%d", modules[imodule]), Form("hCalMapPos_module_%d", modules[imodule]), 8, -20., 20., 8, -12., 5.);
+    Charge_Calo_Module[imodule] = new TH1D(Form("Charge_Calo_Module_%d", modules[imodule]), Form("Charge_Calo_Module_%d", modules[imodule]), 200, 0., 1.);
   }
 
   for (int ilay = 0; ilay < kLayers; ilay++)

@@ -197,6 +197,7 @@ TH1D *TimeA_perBar[kLayers][nBarsPerLayer];
 TH1D *TimeB_perBar[kLayers][nBarsPerLayer];
 TH1D *Time_perBar[kLayers][nBarsPerLayer];  //0.5*(TA + TB)
 TH1D *Charge_Calo_total;  //charge in all calo
+TH1D *Charge_Calo_Module[kModules];  //charge per module
 TH1D *Charge_Calo_crystal[kModules * kCrysPerModule];  //charge per crystal id
 
 // TH2D *dE_vs_tof_perBar[kLayers][kBars];
