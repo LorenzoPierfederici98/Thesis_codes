@@ -8,8 +8,6 @@
 #include <iostream>     // For input/output operations (std::cerr)
 
 void DisplayCaloModules(const vector<int> &fileNumbers) {
-    int nModules = 7;  // Number of modules (adjust if needed)
-    //int modules[7] = {4, 5, 3, 6, 2, 7, 1};
     int modules[7] = {7, 6, 5, 4, 3, 2, 1};
     gStyle->SetOptStat(11);  // Display just histo's name and # of entries
     gStyle->SetStatX(0.3);  // Stats box on the left
@@ -27,7 +25,7 @@ void DisplayCaloModules(const vector<int> &fileNumbers) {
         }
 
         // Create a canvas and divide it into subplots
-        TCanvas* c1 = new TCanvas("c1", Form("Display Run %d", runNumber), 2500, 1500);
+        TCanvas* c1 = new TCanvas("c1", Form("Display Run %d", runNumber), 2400, 1200);
         c1->Divide(6, 2);  // 2 rows and 6 columns
 
         // Loop over all modules and display their respective histograms in subplots
@@ -35,8 +33,14 @@ void DisplayCaloModules(const vector<int> &fileNumbers) {
         for (int moduleID : modules) {
             // Move to the appropriate pad (one pad per module)
             c1->cd(index + 1);  // Go to the (moduleID + 1)-th pad
-            gPad->SetRightMargin(0.2);
+            gPad->SetRightMargin(0.18);  // Adjust margin for color palette space
+            gPad->SetLeftMargin(0.12);
+            gPad->SetTopMargin(0.1);
+            gPad->SetBottomMargin(0.15);
             gStyle->SetPalette(1);
+
+            // Set pad aspect ratio to 1 (square)
+            //gPad->SetPad(0.1, 0.1, 0.9, 0.9);  // Set the pad coordinates
 
             // Retrieve the 2D histogram for the current module
             TH2D* hCalMapPos = (TH2D*)inFile->Get(Form("hCalMapPos_module_%d", moduleID));
@@ -50,9 +54,10 @@ void DisplayCaloModules(const vector<int> &fileNumbers) {
 
             // Only draw if there are entries
             if (entries > 0) {
-                hCalMapPos->Draw("COLZ TEXT");  // Draw histogram with color palette
+                hCalMapPos->Draw("COLZ");  // Draw histogram with color palette
                 hCalMapPos->GetXaxis()->SetTitle("X");
                 hCalMapPos->GetYaxis()->SetTitle("Y");
+                hCalMapPos->SetMarkerStyle(20);
                 gPad->SetLogz(1);
             } else {
                 std::cout << "Warning: Histogram for module " << moduleID << " is empty." << std::endl;
