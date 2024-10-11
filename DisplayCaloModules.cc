@@ -39,9 +39,6 @@ void DisplayCaloModules(const vector<int> &fileNumbers) {
             gPad->SetBottomMargin(0.15);
             gStyle->SetPalette(1);
 
-            // Set pad aspect ratio to 1 (square)
-            //gPad->SetPad(0.1, 0.1, 0.9, 0.9);  // Set the pad coordinates
-
             // Retrieve the 2D histogram for the current module
             TH2D* hCalMapPos = (TH2D*)inFile->Get(Form("hCalMapPos_module_%d", moduleID));
             if (!hCalMapPos) {
@@ -58,7 +55,10 @@ void DisplayCaloModules(const vector<int> &fileNumbers) {
                 hCalMapPos->GetXaxis()->SetTitle("X");
                 hCalMapPos->GetYaxis()->SetTitle("Y");
                 hCalMapPos->SetMarkerStyle(20);
-                gPad->SetLogz(1);
+                //hCalMapPos->SetMarkerSize(2);
+
+
+                //gPad->SetLogz(1);
             } else {
                 std::cout << "Warning: Histogram for module " << moduleID << " is empty." << std::endl;
             }
