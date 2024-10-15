@@ -155,6 +155,8 @@ void AnalyzeFOOT(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t ne
   string beamEnergyStr = to_string(parGeo->GetBeamPar().Energy * 1000);
   TObjString objString(beamEnergyStr.c_str());
   TObjString materialObj(parGeo->GetBeamPar().Material);
+  fout->cd();
+  objString.Write("BeamEnergyInfo");
   fitFile->cd();                     // Ensure the correct file is active
   objString.Write("BeamEnergyInfo"); // Write the primary beam energy and type of particle in the fit file
   materialObj.Write("IonInfo");
@@ -568,11 +570,11 @@ void BookHistograms()
 
   for(int icrystal=0; icrystal < kModules*kCrysPerModule; icrystal++)
   {
-    Charge_Calo_crystal[icrystal] = new TH1D(Form("Charge_Calo_crystalId_%d", icrystal), Form("Charge_Calo_crystalID_%d", icrystal), 100, -0.2, 1.);
+    Charge_Calo_crystal[icrystal] = new TH1D(Form("Charge_Calo_crystalId_%d", icrystal), Form("Charge_Calo_crystalID_%d", icrystal), 500, -0.2, 1.);
   }
   for(int imodule=0; imodule < kModules; imodule++)
   {
-    hCalMapPos[imodule] = new TH2D(Form("hCalMapPos_module_%d", modules[imodule]), Form("hCalMapPos_module_%d", modules[imodule]), 8, -20., 20., 8, -12., 5.);
+    hCalMapPos[imodule] = new TH2D(Form("hCalMapPos_module_%d", modules[imodule]), Form("hCalMapPos_module_%d", modules[imodule]), 17, -20., 20., 8, -11., 5.);
     Charge_Calo_Module[imodule] = new TH1D(Form("Charge_Calo_Module_%d", modules[imodule]), Form("Charge_Calo_Module_%d", modules[imodule]), 200, 0., 1.);
   }
 

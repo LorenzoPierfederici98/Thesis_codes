@@ -1,4 +1,5 @@
 //Macro that plots the 2D histograms of x-y hit coordinates in the calorimeter.
+//Histograms are retireved form the AnaLizeFOOT.cc root files output.
 //To be run with root -l 'DisplayCaloModules.cc({4742, 4743, 4744, 4745, 4828})'
 
 #include <TFile.h>      // For opening ROOT files
@@ -15,7 +16,7 @@ void DisplayCaloModules(const vector<int> &fileNumbers) {
     for(int runNumber : fileNumbers)
     {
         // Construct the filename for the specific run
-        TString filename = Form("AnaFOOT_Merge_HIT2022_%d.root", runNumber);
+        TString filename = Form("AnaFOOT_Decoded_HIT2022_%d.root", runNumber);
 
         // Open the ROOT file
         TFile* inFile = new TFile(filename);
@@ -56,9 +57,7 @@ void DisplayCaloModules(const vector<int> &fileNumbers) {
                 hCalMapPos->GetYaxis()->SetTitle("Y");
                 hCalMapPos->SetMarkerStyle(20);
                 //hCalMapPos->SetMarkerSize(2);
-
-
-                //gPad->SetLogz(1);
+                gPad->SetLogz(1);
             } else {
                 std::cout << "Warning: Histogram for module " << moduleID << " is empty." << std::endl;
             }

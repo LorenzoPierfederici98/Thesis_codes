@@ -1,4 +1,4 @@
-//Analyzes the charge fit results for every bar of the TW and plots them against
+//Analyzes the charge fit results form the AnalyzeFOOT.cc macro for every bar of the TW and plots them against
 //the beam energy. If more than one charge value is found for a certain energy a mean is computed.
 //To be run with e.g.  root -l -q 'AnalyzeFit.cc({4742, 4743, 4743, 4744, 4896, 4897, 4898, 4899, 4900})' 
 
@@ -201,7 +201,7 @@ void SavePlots(FitData &data, const vector<TString> &layer, const vector<TString
 
 void AnalyzeFit(const vector<int> &fileNumbers) {
     // Define file names and paths
-    TString baseName = "AnaFOOT_Merge_HIT2022_";
+    TString baseName = "AnaFOOT_Decoded_HIT2022_";
     TString suffix = "_Fit.root";
     TString fitresult = "FitResult_";
     TString fitcharge = "Charge_";
