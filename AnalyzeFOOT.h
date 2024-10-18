@@ -20,8 +20,7 @@
 #include <TH1.h>
 #include <TROOT.h>
 #include <TKey.h>
-#include <TSpectrum.h>
-
+#include <TLatex.h>
 
 #include "TAGcampaignManager.hxx"
 #include "TAGactTreeReader.hxx"
@@ -197,8 +196,8 @@ TH1D *TimeA_perBar[kLayers][nBarsPerLayer];
 TH1D *TimeB_perBar[kLayers][nBarsPerLayer];
 TH1D *Time_perBar[kLayers][nBarsPerLayer];  //0.5*(TA + TB)
 TH1D *Charge_Calo_total;  //charge in all calo
-TH1D *Charge_Calo_Module[kModules];  //charge per module
-TH1D *Charge_Calo_crystal[kModules * kCrysPerModule];  //charge per crystal id
+TH1D *Charge_Calo_Module[kModules];  //charge per module in calo
+TH1D *Charge_Calo_crystal[kModules * kCrysPerModule];  //charge per crystal id in calo
 
 // TH2D *dE_vs_tof_perBar[kLayers][kBars];
 TH1D *heloss_all;
@@ -206,6 +205,7 @@ TH1D *heloss_all;
 TH2D *hTwPos[kLayers];
 TH2D *hTwMapPos;
 TH2D *hCalMapPos[kModules];  //2D histogram of x, y positions in the calorimeter
+TH2D *hCalMapCrystalID[kModules];
 TH2D *hTwMapPos_TWpntBin;
 TH2D *hTwMapPos_TWpnt;
 TH2D *hTwMapPos_TWpnt_Z[kCharges];

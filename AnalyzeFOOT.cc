@@ -269,7 +269,6 @@ void AnalyzeFOOT(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t ne
 
       Int_t bar = hit->GetBar();
       Int_t layer = hit->GetLayer();
-      //Int_t crystal_id = hit_ca->GetCrystalId();
       Int_t NmcTrk = hit->GetMcTracksN();
       Double_t eloss = hit->GetEnergyLoss();
       Double_t tof = hit->GetToF();
@@ -436,27 +435,36 @@ void AnalyzeFOOT(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t ne
       }
     }
 
-    Int_t nHitsCalo = caNtuHit->GetHitsN();  //number of hits in calo
+    Int_t nHitsCalo = caNtuHit->GetHitsN();  // number of hits in the calorimeter
 
-    for(int ihit=0; ihit < nHitsCalo; ihit++){
-
+    for (int ihit = 0; ihit < nHitsCalo; ihit++) {
       TACAhit *hit_ca = caNtuHit->GetHit(ihit);
-      if(!hit_ca)
-        continue;
+      if (!hit_ca)
+          continue;
 
       Int_t crystal_id = hit_ca->GetCrystalId();
       Double_t charge_calo = hit_ca->GetCharge();
       Int_t ModuleID = crystal_id / kCrysPerModule;
       TVector3 CaloPosition = hit_ca->GetPosition();
+
       Charge_Calo_total->Fill(charge_calo);
       Charge_Calo_total->GetXaxis()->SetRangeUser(Charge_Calo_total->GetBinLowEdge(Charge_Calo_total->FindFirstBinAbove()), 
-                                   Charge_Calo_total->GetBinLowEdge(Charge_Calo_total->FindLastBinAbove() + 1));
+                                Charge_Calo_total->GetBinLowEdge(Charge_Calo_total->FindLastBinAbove() + 1));
       Charge_Calo_crystal[crystal_id]->Fill(charge_calo);
+
+      // Fill the histogram with the usual values (e.g., charge)
       hCalMapPos[ModuleID]->Fill(CaloPosition.X(), CaloPosition.Y());
-      if(ModuleID==1)
+      double valueToSet = (crystal_id == 0) ? 0.0001 : static_cast<double>(crystal_id);
+      hCalMapCrystalID[ModuleID]->SetBinContent(
+        hCalMapCrystalID[ModuleID]->GetXaxis()->FindBin(CaloPosition.X()),
+        hCalMapCrystalID[ModuleID]->GetYaxis()->FindBin(CaloPosition.Y()),
+        valueToSet
+      );
+
+      if (ModuleID == 6)
         cout << "x: " << CaloPosition.X() << " y: " << CaloPosition.Y() << " z: " << CaloPosition.Z() << " ID: " << crystal_id << " module: " << ModuleID << endl;
-      Charge_Calo_Module[ModuleID]->Fill(charge_calo);
-    }
+}
+
     
   } // close for loop over events
 
@@ -574,7 +582,8 @@ void BookHistograms()
   }
   for(int imodule=0; imodule < kModules; imodule++)
   {
-    hCalMapPos[imodule] = new TH2D(Form("hCalMapPos_module_%d", modules[imodule]), Form("hCalMapPos_module_%d", modules[imodule]), 17, -20., 20., 8, -11., 5.);
+    hCalMapPos[imodule] = new TH2D(Form("hCalMapPos_module_%d", modules[imodule]), Form("hCalMapPos_module_%d", modules[imodule]), 27, -27., 27., 27, -27., 27.);
+    hCalMapCrystalID[imodule] = new TH2D(Form("hCalMapCrystalID_module_%d", modules[imodule]), Form("hCalMapCrystalID_module_%d", modules[imodule]), 27, -27., 27., 27, -27., 27.);
     Charge_Calo_Module[imodule] = new TH1D(Form("Charge_Calo_Module_%d", modules[imodule]), Form("Charge_Calo_Module_%d", modules[imodule]), 200, 0., 1.);
   }
 
