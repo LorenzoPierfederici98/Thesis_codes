@@ -8,6 +8,36 @@
 #include <TLegend.h>    // For legends (optional, only if needed)
 #include <iostream>     // For input/output operations (std::cerr)
 
+Double_t RetrieveEnergy(int runNumber, TFile* inFile) {
+    if (!inFile) {
+        std::cerr << "Error: Input file is null for run " << runNumber << std::endl;
+        return -1;  // Return a default invalid value
+    }
+
+    TObject* obj = inFile->Get("BeamEnergyInfo");
+    
+    if (!obj) {
+        std::cerr << "Error: Could not retrieve 'BeamEnergyInfo' from file for run " << runNumber << std::endl;
+        return -1;  // Return a default invalid value
+    }
+
+    // Check if the retrieved object is a TObjString
+    if (obj->InheritsFrom(TObjString::Class())) {
+        TObjString* energyObj = (TObjString*)obj;
+        Double_t beamEnergy = energyObj->GetString().Atof();
+        return beamEnergy;
+    } else {
+        std::cerr << "Error: 'BeamEnergyInfo' is not a TObjString for run " << runNumber << std::endl;
+        return -1;  // Return a default invalid value
+    }
+}
+
+std::string ConvertFileNumbersToString(const int& runNumber) {
+    std::stringstream ss;
+    ss << runNumber;
+    return ss.str();
+}
+
 
 void DisplayCaloModules(const vector<int> &fileNumbers) {
     int modules[7] = {7, 6, 5, 4, 3, 2, 1};
@@ -16,8 +46,8 @@ void DisplayCaloModules(const vector<int> &fileNumbers) {
 
     for (int runNumber : fileNumbers) {
         // Construct the filename for the specific run
-        TString filename = Form("AnaFOOT_Decoded_HIT2022_%d.root", runNumber);
-
+        TString filename = Form("AnaFOOT_Calo_Decoded_HIT2022_%d.root", runNumber);
+        std::string runNumberStr = ConvertFileNumbersToString(runNumber);
         // Open the ROOT file
         TFile* inFile = new TFile(filename);
         if (!inFile || inFile->IsZombie()) {
@@ -25,9 +55,18 @@ void DisplayCaloModules(const vector<int> &fileNumbers) {
             return;
         }
 
+        Double_t beamEnergy = RetrieveEnergy(runNumber, inFile);
+
         // Create two canvases: one for positions and one for crystal IDs
         TCanvas* c1 = new TCanvas("c1", Form("Position Display Run %d", runNumber), 2400, 1200);
-        c1->Divide(6, 2);  // 2 rows and 6 columns for position histograms
+        c1->Divide(6, 2, 0.01, 0.09);  // 2 rows and 6 columns for position histograms
+        // Add the global title using TLatex
+        c1->cd();
+        TLatex* latex = new TLatex();
+        latex->SetNDC();  // Use normalized device coordinates
+        latex->SetTextAlign(22);  // Center the text horizontally
+        latex->SetTextSize(0.02);  // Adjust text size to fit properly
+        latex->DrawLatex(0.5, 0.95, Form("2D Histograms: x, y hits Run: %s | Beam Energy: %.0f MeV", runNumberStr.c_str(), beamEnergy));
 
         int customPadOrder[7] = {1, 2, 3, 4, 5, 6, 12};  // Place module 1 in the last pad (12)
         // Loop over all modules and display their respective histograms in subplots
@@ -53,16 +92,16 @@ void DisplayCaloModules(const vector<int> &fileNumbers) {
             std::cout << "Drawing position histogram for module " << moduleID << ", Entries: " << entriesPos << std::endl;
 
             if (entriesPos > 0) {
-                hCalMapPos->Draw("SCAT");  // Draw histogram with color palette
+                hCalMapPos->Draw("COLZ");  // Draw histogram with color palette
                 hCalMapPos->GetXaxis()->SetTitle("X");
                 hCalMapPos->GetYaxis()->SetTitle("Y");
-                hCalMapPos->SetMarkerStyle(6);
-                //gPad->SetLogz(1);
+                //hCalMapPos->SetMarkerStyle(6);
+                //hCalMapPos->SetMarkerSize(0.2);
+                gPad->SetLogz(1);
             } else {
                 std::cout << "Warning: Position histogram for module " << moduleID << " is empty." << std::endl;
             }
             //hCalMapPos->SetDirectory(0);
-
 
             // Retrieve the 2D crystal ID histogram for the current module
             TH2D* hCalMapCrystalID = (TH2D*)inFile->Get(Form("hCalMapCrystalID_module_%d", moduleID));
@@ -86,6 +125,7 @@ void DisplayCaloModules(const vector<int> &fileNumbers) {
                 std::cout << "Warning: CrystalID histogram for module " << moduleID << " is empty." << std::endl;
             }
             //hCalMapCrystalID->SetDirectory(0);
+
 
             index += 1;
         }

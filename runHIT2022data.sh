@@ -6,6 +6,7 @@
 echo "$@"
 
 runNumber='4742'
+#runNumber='4742 4743 4744 4745 4828'
 #Runs without target:
 #runNumber='4742 4743 4744 4745 4766 4801 4828 4830 4837 '
 #Runs in local:
@@ -18,11 +19,12 @@ echo Running Macro \in Batch
 for x in $runNumber
     do
 echo submit run number $x
-	
-#input dalla dir production:
-#./runMacroBatchT1.sh -i /storage/gpfs_data/foot/production/HIT2022/Merge_HIT2022_"$x".root -o /storage/gpfs_data/foot/mtoppi/OutputMacro/ -p AnaFOOT -m 1 -n 100	
-#input dalla tua dir:
-./runMacroBatchT1.sh -i /mnt/c/Users/Lorenzo/Desktop/shoe/DataDecoded/Merge_HIT2022_"$x".root -o /mnt/c/Users/Lorenzo/Desktop/shoe/OutputMacro/ -p AnaFOOT -m 1 -n 1000 -r AnalyzeFOOT
-	
+
+#./runMacroBatchT1.sh -i /mnt/c/Users/Lorenzo/Desktop/shoe/DataDecoded/Decoded_HIT2022_"$x".root -o /mnt/c/Users/Lorenzo/Desktop/shoe/OutputMacro/ -p AnaFOOT -m 1 -n 1000 -r AnalyzeFOOT
+
+#./runMacroBatchT1.sh -i /mnt/c/Users/Lorenzo/Desktop/shoe/DataDecoded/Decoded_HIT2022_"$x".root -o /mnt/c/Users/Lorenzo/Desktop/shoe/OutputMacro/ -p AnaFOOT_TW -m 1 -n 1000 -r AnalyzeTWChargeTime
+
+./runMacroBatchT1.sh -i /mnt/c/Users/Lorenzo/Desktop/shoe/DataDecoded/Decoded_HIT2022_"$x".root -o /mnt/c/Users/Lorenzo/Desktop/shoe/OutputMacro/ -p AnaFOOT_Calo -m 1 -n 1000 -r AnalyzeCalo
+
 done
 echo  All the files needed for HIT2022 analysis are submitted!

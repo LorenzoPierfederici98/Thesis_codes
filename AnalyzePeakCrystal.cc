@@ -1,8 +1,8 @@
 //Macro that computes the sum and fits the 1D charge histograms for a given crystal of the calorimeter.
-//Histograms are retireved form the AnaLizeFOOT.cc root output files.
+//The histograms are retireved form the AnaLizeFOOT.cc root output files and are summed.
 //The user provides the run numbers (all of them must have the same energy) and the crystal ID.
 //To be run with e.g.  root -l -q 'AnalyzePeakCrystal.cc({4742, 4743, 4743, 4744, 4745, 4828}, 1, x_min, x_max)',
-//all the runs having the same energy, 1 is the crystal ID. 
+//all the runs having the same energy, 1 is the crystal ID, x_min and x_max define the range surrounding the peak. 
 
 #include <TFile.h>
 #include <TCanvas.h>
@@ -159,7 +159,7 @@ pair<TH1D*, Double_t> SumHistograms(const std::vector<int>& fileNumbers, const T
     
     // Loop over all file numbers
     for (int runNumber : fileNumbers) {
-        TString filename = Form("AnaFOOT_Decoded_HIT2022_%d.root", runNumber);
+        TString filename = Form("AnaFOOT_Calo_Decoded_HIT2022_%d.root", runNumber);
         TFile* inFile = TFile::Open(filename);
         if (!inFile || inFile->IsZombie()) {
             std::cerr << "Error: Could not open file " << filename << std::endl;

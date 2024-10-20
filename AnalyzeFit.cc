@@ -201,7 +201,7 @@ void SavePlots(FitData &data, const vector<TString> &layer, const vector<TString
 
 void AnalyzeFit(const vector<int> &fileNumbers) {
     // Define file names and paths
-    TString baseName = "AnaFOOT_Decoded_HIT2022_";
+    TString baseName = "AnaFOOT_TW_Decoded_HIT2022_";
     TString suffix = "_Fit.root";
     TString fitresult = "FitResult_";
     TString fitcharge = "Charge_";
