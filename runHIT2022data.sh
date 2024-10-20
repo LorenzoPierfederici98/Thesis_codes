@@ -22,9 +22,9 @@ echo submit run number $x
 
 #./runMacroBatchT1.sh -i /mnt/c/Users/Lorenzo/Desktop/shoe/DataDecoded/Decoded_HIT2022_"$x".root -o /mnt/c/Users/Lorenzo/Desktop/shoe/OutputMacro/ -p AnaFOOT -m 1 -n 1000 -r AnalyzeFOOT
 
-#./runMacroBatchT1.sh -i /mnt/c/Users/Lorenzo/Desktop/shoe/DataDecoded/Decoded_HIT2022_"$x".root -o /mnt/c/Users/Lorenzo/Desktop/shoe/OutputMacro/ -p AnaFOOT_TW -m 1 -n 1000 -r AnalyzeTWChargeTime
+#./runMacroBatchT1.sh -i /mnt/c/Users/Lorenzo/Desktop/shoe/DataDecoded/Decoded_HIT2022_"$x".root -o /mnt/c/Users/Lorenzo/Desktop/shoe/OutputMacro/TW -p AnaFOOT_TW -m 1 -n 1000 -r AnalyzeTWChargeTime
 
-./runMacroBatchT1.sh -i /mnt/c/Users/Lorenzo/Desktop/shoe/DataDecoded/Decoded_HIT2022_"$x".root -o /mnt/c/Users/Lorenzo/Desktop/shoe/OutputMacro/ -p AnaFOOT_Calo -m 1 -n 1000 -r AnalyzeCalo
+./runMacroBatchT1.sh -i /mnt/c/Users/Lorenzo/Desktop/shoe/DataDecoded/Decoded_HIT2022_"$x".root -o /mnt/c/Users/Lorenzo/Desktop/shoe/OutputMacro/Calo -p AnaFOOT_Calo -m 1 -n 1000 -r AnalyzeCalo
 
 done
 echo  All the files needed for HIT2022 analysis are submitted!

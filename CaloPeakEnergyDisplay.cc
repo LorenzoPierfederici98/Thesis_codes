@@ -1,3 +1,8 @@
+//Macro that plots the charge given by the fit performed in AnalyzePeakCrystal.cc in a
+//single crystal vs the beam energy. The fit results are stored in root files, named like
+//Fit_Calo_Crystal_1_Energy_200MeV.root. To be run with root -l 'CaloPeakEnergyDisplay({180, 200, 220}, 1)'
+//{180, 200, 220} being the vector of energy values and 1 the crystalID.
+
 #include <TFile.h>
 #include <TFitResult.h>
 #include <TCanvas.h>
@@ -59,9 +64,13 @@ void CaloPeakEnergyDisplay(const std::vector<int> &energies, const int crystalID
     graph->SetMarkerSize(1.2);
     graph->GetXaxis()->SetTitle("Primary beam energy [MeV]");
     graph->GetYaxis()->SetTitle("Mean charge");
-
+    double x_max = graph->GetXaxis()->GetXmax();
     // Draw the graph after the loop
     graph->Draw("AP");
+    graph->GetXaxis()->SetLimits(0., x_max);
+    graph->GetYaxis()->SetLimits(0., 0.6);
+    gPad->Modified();
+    gPad->Update();
     
     // Save the canvas as a PNG image
     canvas->SaveAs(Form("Plots/Calo_FitCharge_Energy_Crystal_%d.png", crystalID));

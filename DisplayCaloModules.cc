@@ -46,7 +46,7 @@ void DisplayCaloModules(const vector<int> &fileNumbers) {
 
     for (int runNumber : fileNumbers) {
         // Construct the filename for the specific run
-        TString filename = Form("AnaFOOT_Calo_Decoded_HIT2022_%d.root", runNumber);
+        TString filename = Form("Calo/AnaFOOT_Calo_Decoded_HIT2022_%d.root", runNumber);
         std::string runNumberStr = ConvertFileNumbersToString(runNumber);
         // Open the ROOT file
         TFile* inFile = new TFile(filename);
@@ -95,7 +95,7 @@ void DisplayCaloModules(const vector<int> &fileNumbers) {
                 hCalMapPos->Draw("COLZ");  // Draw histogram with color palette
                 hCalMapPos->GetXaxis()->SetTitle("X");
                 hCalMapPos->GetYaxis()->SetTitle("Y");
-                //hCalMapPos->SetMarkerStyle(6);
+                //hCalMapPos->SetMarkerStyle(20);
                 //hCalMapPos->SetMarkerSize(0.2);
                 gPad->SetLogz(1);
             } else {
