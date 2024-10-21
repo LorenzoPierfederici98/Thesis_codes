@@ -195,14 +195,21 @@ TH1D *Charge_perBar[kLayers][nBarsPerLayer];  //sqrt(QA*QB)
 TH1D *TimeA_perBar[kLayers][nBarsPerLayer];
 TH1D *TimeB_perBar[kLayers][nBarsPerLayer];
 TH1D *Time_perBar[kLayers][nBarsPerLayer];  //0.5*(TA + TB)
+TH1D *PosX;  //bar hit position in layerX
+TH1D *PosY;  //bar hit position in layerY
+TH1D *Bar_ID_X;  //bar ID for a given layer
+TH1D *Bar_ID_Y;
+TH1D *PosX_Bar9;
+TH1D *PosY_Bar9;
+TH1D *hToF;
+TH1D *hToF_CentralBars;
 
 // TH2D *dE_vs_tof_perBar[kLayers][kBars];
 TH1D *heloss_all;
 // TH1D *heloss[kTrigsN];;
 TH2D *hTwPos[kLayers];
 TH2D *hTwMapPos;
-TH2D *hCalMapPos[kModules];  //2D histogram of x, y positions in the calorimeter
-TH2D *hCalMapCrystalID[kModules];
+TH2D *hTwMapPos_Bar9;
 TH2D *hTwMapPos_TWpntBin;
 TH2D *hTwMapPos_TWpnt;
 TH2D *hTwMapPos_TWpnt_Z[kCharges];

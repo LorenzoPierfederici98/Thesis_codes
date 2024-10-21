@@ -193,6 +193,7 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
 
     Int_t nHitsX = twNtuHit->GetHitN((Int_t)LayerX);
     Int_t nHitsY = twNtuHit->GetHitN((Int_t)LayerY);
+
     
     if (debug)
       cout << " TWhits X::" << nHitsX << " Y::" << nHitsY << endl;
@@ -203,6 +204,10 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
       TATWhit *hitX = twNtuHit->GetHit(ihitX, (Int_t)LayerX);
       Double_t posAlongX = hitX->GetPosition(); // it provides the X coordinate
       Double_t posBarY = twparGeo->GetBarPosition((Int_t)LayerX, hitX->GetBar())[1];
+      Double_t barX = hitX->GetBar();
+      if (hitX->GetEnergyLoss() > 0)
+        Bar_ID_X->Fill(barX);
+        PosX->Fill(posAlongX);
 
       for (int ihitY = 0; ihitY < nHitsY; ihitY++)
       {
@@ -210,11 +215,12 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
         TATWhit *hitY = twNtuHit->GetHit(ihitY, (Int_t)LayerY);
         Double_t posAlongY = hitY->GetPosition(); // it provides the Y coordinate
         Double_t posBarX = twparGeo->GetBarPosition((Int_t)LayerY, hitY->GetBar())[0];
-
-        if (hitX->GetEnergyLoss() < 0 || hitY->GetEnergyLoss() < 0)
-          continue;
-
-        hTwMapPos->Fill(posAlongX, posAlongY);
+        Double_t barY = hitY->GetBar();
+        if (hitY->GetEnergyLoss() > 0)
+          Bar_ID_Y->Fill(barY);
+          PosY->Fill(posAlongX);
+          hTwMapPos->Fill(posAlongX, posAlongY);
+        
 
         if (debug)
         {
@@ -283,6 +289,10 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
       {
         // dE_vs_tof_perBar[layer][bar]->Fill(tof,eloss);
         dE_vs_tof[layer]->Fill(tof, eloss);
+        hToF->Fill(tof);
+        if (bar == 8 || bar == 9 || bar == 10) {
+          hToF_CentralBars->Fill(tof);
+        }
         heloss_all->Fill(eloss);
         ChargeA_perBar[layer][bar]->Fill(chargeA);
         ChargeB_perBar[layer][bar]->Fill(chargeB);
@@ -306,22 +316,52 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
                                    Time_perBar[layer][bar]->GetBinLowEdge(Time_perBar[layer][bar]->FindLastBinAbove() + 1));
       }
 
+
       if (layer == (Int_t)LayerX)
       {
         Double_t posAlongX = hit->GetPosition();
+        if (bar == 9){
+          PosX_Bar9->Fill(posAlongX);
+        }
         Double_t posBarY = twparGeo->GetBarPosition(layer, bar)[1];
         hTwPos[layer]->Fill(posAlongX, posBarY);
       }
       else if (layer == (Int_t)LayerY)
       {
         Double_t posAlongY = hit->GetPosition();
+        if (bar == 9){
+          PosY_Bar9->Fill(posAlongY);
+        }
         Double_t posBarX = twparGeo->GetBarPosition(layer, bar)[0];
         hTwPos[layer]->Fill(posBarX, posAlongY);
       }
     }
-    }
+  }
 
   gTAGroot.EndEventLoop();
+
+  TFitResultPtr t = hToF->Fit("gaus", "QS");
+
+  if (t->IsValid())
+      {
+        t->Write(Form("TW_Fit"));
+      }
+  else
+      {
+        std::cerr << "Fit TW failed" << std::endl;
+      }
+
+  TFitResultPtr t_c = hToF_CentralBars->Fit("gaus", "QS");
+
+  if (t_c->IsValid())
+      {
+        t_c->Write(Form("TW_Fit_CentralBars"));
+      }
+  else
+      {
+        std::cerr << "Fit TW Central Bars failed" << std::endl;
+      }
+  
 
   const Double_t fractionThreshold = 0.009; // Fraction of total entries required (e.g., 0.1 for 10%)
   Int_t fitThreshold = static_cast<Int_t>(fractionThreshold * nentries);
@@ -405,6 +445,15 @@ void BookHistograms()
   // AddHistogram(fpHisStripMap);
   int modules[7] = {4, 5, 3, 6, 2, 7, 1};  // module enumeration following the excel file
 
+  PosX = new TH1D("Hit_Pos_LayerX", "Hit_Pos_LayerX", 220, -22., 22.);  //2 mm/bin
+  PosY = new TH1D("Hit_Pos_LayerY", "Hit_Pos_LayerY", 220, -22., 22.);
+  PosX_Bar9 = new TH1D("Hit_Pos_LayerX_Bar9", "Hit_Pos_LayerX_Bar9", 220, -22., 22.);
+  PosY_Bar9 = new TH1D("Hit_Pos_LayerY_Bar9", "Hit_Pos_LayerY_Bar9", 220, -22., 22.);
+  Bar_ID_X = new TH1D("BarID_LayerX", "BarID_LayerX", 200, 0, 19);
+  Bar_ID_Y = new TH1D("BarID_LayerY", "BarID_LayerY", 200, 0, 19);
+
+  hToF = new TH1D("ToF_TW", "ToF_TW", 220, 6., 12.);
+  hToF_CentralBars = new TH1D("ToF_TW_CentralBars", "ToF_TW_CentralBars", 220, 6., 12.);
 
   for (int ilay = 0; ilay < kLayers; ilay++)
   {
@@ -433,6 +482,7 @@ void BookHistograms()
   hTwMapPos_TWpnt = new TH2D("hTwMapPos_TWpnt", "hTwMapPos_TWpnt", 220, -22., 22., 220, -22., 22.);        // 2 mm/bin - 2 mm/bin
 
   hTwMapPos = new TH2D("hTwMapPos", "hTwMapPos", 220, -22., 22., 220, -22., 22.); // 2 mm/bin - 2 mm/bin
+  hTwMapPos_Bar9 = new TH2D("hTwMapPos_Bar9", "hTwMapPos_Bar9", 220, -22., 22., 220, -22., 22.);
 
   hTwMapPos_1Cross = new TH2D("hTwMapPos_1Cross", "hTwMapPos_1Cross", 220, -22., 22., 220, -22., 22.); // 2 mm/bin - 2 mm/bin
   hResX_1Cross = new TH1D("hResX_1Cross", "hResX_1Cross", 400, -20., 20.);
