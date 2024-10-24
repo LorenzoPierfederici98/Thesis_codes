@@ -2,6 +2,7 @@
 //performed by the AnalyzeTWChargeTime.cc macro. A mean ToF value and a mean sigma value from the
 //gaussian fit are performed if there are multiple values for a given energy. The mean ToF values and
 //sigmas are plotted against the beam energy, both for the entire TW and for the central bars only.
+//To be run with e.g. root -l 'AnalyzeTofFit.cc({4742, 4743, 4828})'
 
 
 #include <vector>
@@ -31,16 +32,18 @@ pair<double, double> ComputeMeanAndError(const vector<double> &values, const vec
 void PlotGraph(TGraphErrors* graph1, TGraphErrors* graph2, TString canvasTitle, TString graphTitle, TString yAxisTitle, TString legend2, double ylim) {
     TCanvas* c1 = new TCanvas("c1", canvasTitle, 800, 600);
     graph1->SetMarkerStyle(24); graph1->SetMarkerColor(kBlue);
-    graph1->SetTitle(graphTitle); graph1->GetXaxis()->SetTitle("Beam Energy (MeV)");
-    graph1->GetYaxis()->SetTitle(yAxisTitle); graph1->GetYaxis()->SetRangeUser(0, ylim);
+    graph1->SetTitle(graphTitle); graph1->GetXaxis()->SetTitle("Beam Energy [MeV]");
+    graph1->GetYaxis()->SetTitle(yAxisTitle + " [ns]"); graph1->GetYaxis()->SetRangeUser(0, ylim);
     graph1->Draw("AP");
 
     graph2->SetMarkerStyle(24); graph2->SetMarkerColor(kRed);
     graph2->Draw("P same");
 
-    TLegend* legend = new TLegend(0.4, 0.7, 0.6, 0.9);
+    TLegend* legend = new TLegend(0.7, 0.3, 0.9, 0.5);
     legend->AddEntry(graph1, yAxisTitle, "P");
     legend->AddEntry(graph2, legend2, "P");
+    // Automatically position the legend
+    //legend->SetOption("brNDC");
     legend->Draw();
 
     c1->SaveAs("Plots/" + canvasTitle + ".png");
