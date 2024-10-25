@@ -21,6 +21,7 @@
 #include <TROOT.h>
 #include <TKey.h>
 #include <TLatex.h>
+#include <TDirectory.h>
 
 #include "TAGcampaignManager.hxx"
 #include "TAGactTreeReader.hxx"

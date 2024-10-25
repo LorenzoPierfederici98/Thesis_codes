@@ -94,7 +94,8 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
 
   TFile *fout = new TFile(outfile.Data(), "RECREATE");
   fout->cd();
-
+  TDirectory* DirChargeTimeLayerX = fout->mkdir("ChargeTimeLayerX");
+  TDirectory* DirChargeTimeLayerY = fout->mkdir("ChargeTimeLayerY");
   BookHistograms();
 
   TVecPair vPairWrongZ;
@@ -295,11 +296,17 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
         }
         heloss_all->Fill(eloss);
         ChargeA_perBar[layer][bar]->Fill(chargeA);
+        ChargeA_perBar[layer][bar]->SetDirectory(0);
         ChargeB_perBar[layer][bar]->Fill(chargeB);
+        ChargeB_perBar[layer][bar]->SetDirectory(0);
         Charge_perBar[layer][bar]->Fill(chargeBar);
+        Charge_perBar[layer][bar]->SetDirectory(0);
         TimeA_perBar[layer][bar]->Fill(timeA);
+        TimeA_perBar[layer][bar]->SetDirectory(0);
         TimeB_perBar[layer][bar]->Fill(timeB);
+        TimeB_perBar[layer][bar]->SetDirectory(0);
         Time_perBar[layer][bar]->Fill(timeBar);
+        Time_perBar[layer][bar]->SetDirectory(0);
 
         ChargeA_perBar[layer][bar]->GetXaxis()->SetRangeUser(ChargeA_perBar[layer][bar]->GetBinLowEdge(ChargeA_perBar[layer][bar]->FindFirstBinAbove()), 
                                    ChargeA_perBar[layer][bar]->GetBinLowEdge(ChargeA_perBar[layer][bar]->FindLastBinAbove() + 1));
@@ -317,20 +324,33 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
       }
 
 
-      if (layer == (Int_t)LayerX)
-      {
+    static Double_t posAlongX_Bar9 = -999;  // Static variables to store X and Y positions for bar 9
+    static Double_t posAlongY_Bar9 = -999;
+
+    if (layer == (Int_t)LayerX) {
         Double_t posAlongX = hit->GetPosition();
-        if (bar == 9){
-          PosX_Bar9->Fill(posAlongX);
+        if (bar == 9) {
+            PosX_Bar9->Fill(posAlongX);
+            posAlongX_Bar9 = posAlongX;  // Store the X position for bar 9
+            if (posAlongY_Bar9 != -999) {  // Check if Y position is already set
+                hTwMapPos_Bar9->Fill(posAlongX_Bar9, posAlongY_Bar9);  // Fill the 2D histogram
+                posAlongX_Bar9 = -999;  // Reset after filling
+                posAlongY_Bar9 = -999;  // Reset after filling
+            }
         }
         Double_t posBarY = twparGeo->GetBarPosition(layer, bar)[1];
         hTwPos[layer]->Fill(posAlongX, posBarY);
-      }
-      else if (layer == (Int_t)LayerY)
-      {
+    }
+    else if (layer == (Int_t)LayerY) {
         Double_t posAlongY = hit->GetPosition();
-        if (bar == 9){
-          PosY_Bar9->Fill(posAlongY);
+        if (bar == 9) {
+            PosY_Bar9->Fill(posAlongY);
+            posAlongY_Bar9 = posAlongY;  // Store the Y position for bar 9
+            if (posAlongX_Bar9 != -999) {  // Check if X position is already set
+                hTwMapPos_Bar9->Fill(posAlongX_Bar9, posAlongY_Bar9);  // Fill the 2D histogram
+                posAlongX_Bar9 = -999;  // Reset after filling
+                posAlongY_Bar9 = -999;  // Reset after filling
+            }
         }
         Double_t posBarX = twparGeo->GetBarPosition(layer, bar)[0];
         hTwPos[layer]->Fill(posBarX, posAlongY);
@@ -340,6 +360,29 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
 
   gTAGroot.EndEventLoop();
 
+  // After the loop, switch to the correct directory and write the histograms
+  DirChargeTimeLayerY->cd();
+  for (int bar = 0; bar < kBars; ++bar) {
+      ChargeA_perBar[0][bar]->Write();
+      ChargeB_perBar[0][bar]->Write();
+      Charge_perBar[0][bar]->Write();
+      TimeA_perBar[0][bar]->Write();
+      TimeB_perBar[0][bar]->Write();     
+      Time_perBar[0][bar]->Write();
+  }
+
+  DirChargeTimeLayerX->cd();
+  for (int bar = 0; bar < kBars; ++bar) {
+      ChargeA_perBar[1][bar]->Write();
+      ChargeB_perBar[1][bar]->Write();
+      Charge_perBar[1][bar]->Write();
+      TimeA_perBar[1][bar]->Write();
+      TimeB_perBar[1][bar]->Write();   
+      Time_perBar[1][bar]->Write();
+  }
+
+
+  fitFile->cd();
   TFitResultPtr t = hToF->Fit("gaus", "QS");
 
   if (t->IsValid())
@@ -381,6 +424,7 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
 
         if (c->IsValid())
         {
+          fitFile->cd();
           c->Write(Form("FitResult_Charge_layer%d_bar%d", ilay, ibar));
         }
         else
