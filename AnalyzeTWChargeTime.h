@@ -204,6 +204,7 @@ TH1D *PosX_Bar9;
 TH1D *PosY_Bar9;
 TH1D *hToF;
 TH1D *hToF_CentralBars;
+TH1D *hToF_Bar9;  //tof on y when both hitX and hitY are on bar 9
 
 // TH2D *dE_vs_tof_perBar[kLayers][kBars];
 TH1D *heloss_all;
@@ -219,15 +220,17 @@ TH1D *hResY[kCharges];
 TH2D *hTwMapPos_1Cross;
 TH1D *hResX_1Cross;
 TH1D *hResY_1Cross;
+TH2D *hBarID_1Cross;
 
 
 void  InitializeContainers();
 void  BookHistograms();
 void  GetFOOTgeo(TAGcampaignManager* camp_manager, Int_t run_number);
-void  GetRunAndGeoInfo( TAGcampaignManager* campManager, Int_t runNumber);
+void  GetRunAndGeoInfo(TAGcampaignManager* campManager, Int_t runNumber);
 void  SetTreeBranchAddress(TAGactTreeReader *treeReader);
 void  ProjectTracksOnTw(int Z, TVector3 init_pos, TVector3 init_p);
 void  LoopOverMCtracks(Int_t Emin, Int_t Emax, Bool_t isnotrig);
+void  AdjustHistoRange(TH1D *Histo);
 
 Bool_t IsVTregion(int reg);
 

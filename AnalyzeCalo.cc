@@ -190,7 +190,7 @@ void AnalyzeCalo(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t ne
       Charge_Calo_crystal[crystal_id]->Fill(charge_calo);
       Charge_Calo_Module[ModuleID]->Fill(charge_calo);
 
-      // Fill the histogram with the usual values (e.g., charge)
+      // Fill the histogram with the usual values (crystalID)
       hCalMapPos[ModuleID]->Fill(CaloPosition.X(), CaloPosition.Y());
       double valueToSet = (crystal_id == 0) ? 0.0001 : static_cast<double>(crystal_id);
       hCalMapCrystalID[ModuleID]->SetBinContent(
