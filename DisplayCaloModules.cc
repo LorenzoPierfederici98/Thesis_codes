@@ -40,15 +40,16 @@ std::string ConvertFileNumbersToString(const int& runNumber) {
 
 
 void DisplayCaloModules(const vector<int> &fileNumbers) {
-    int modules[7] = {7, 6, 5, 4, 3, 2, 1};
-    gStyle->SetOptStat(11);  // Display just histo's name and # of entries
-    gStyle->SetStatX(0.3);   // Stats box on the left
+    int modules[7] = {7, 6, 5, 4, 3, 2, 1};  // List of modules
+    gStyle->SetOptStat(0);  // Display histogram stats (name and entries)
+    
+    TCanvas* c1 = new TCanvas("c1", "Combined Display", 1200, 800);
+    c1->SetRightMargin(0.15);  // Increase right margin to accommodate the color bar
+    gPad->SetLogz(1);
+    gStyle->SetPalette(1);
 
     for (int runNumber : fileNumbers) {
-        // Construct the filename for the specific run
         TString filename = Form("Calo/AnaFOOT_Calo_Decoded_HIT2022_%d.root", runNumber);
-        std::string runNumberStr = ConvertFileNumbersToString(runNumber);
-        // Open the ROOT file
         TFile* inFile = new TFile(filename);
         if (!inFile || inFile->IsZombie()) {
             std::cerr << "Error: Could not open file " << filename << std::endl;
@@ -57,86 +58,53 @@ void DisplayCaloModules(const vector<int> &fileNumbers) {
 
         Double_t beamEnergy = RetrieveEnergy(runNumber, inFile);
 
-        // Create two canvases: one for positions and one for crystal IDs
-        TCanvas* c1 = new TCanvas("c1", Form("Position Display Run %d", runNumber), 2400, 1200);
-        c1->Divide(6, 2, 0.01, 0.09);  // 2 rows and 6 columns for position histograms
-        // Add the global title using TLatex
-        c1->cd();
-        TLatex* latex = new TLatex();
-        latex->SetNDC();  // Use normalized device coordinates
-        latex->SetTextAlign(22);  // Center the text horizontally
-        latex->SetTextSize(0.02);  // Adjust text size to fit properly
-        latex->DrawLatex(0.5, 0.95, Form("2D Histograms: x, y hits Run: %s | Beam Energy: %.0f MeV", runNumberStr.c_str(), beamEnergy));
+        bool firstPlotPos = true;
 
-        int customPadOrder[7] = {1, 2, 3, 4, 5, 6, 12};  // Place module 1 in the last pad (12)
-        // Loop over all modules and display their respective histograms in subplots
-        int index = 0;
         for (int moduleID : modules) {
-            // --- For the position plot (hCalMapPos) ---
-            int padNumber = customPadOrder[index];  // Get the custom pad number
-            c1->cd(padNumber);
-            gPad->SetRightMargin(0.15);  // Adjust margin for color palette space
-            gPad->SetLeftMargin(0.1);
-            gPad->SetTopMargin(0.1);
-            gPad->SetBottomMargin(0.15);
-            gStyle->SetPalette(1);
-
-            // Retrieve the 2D position histogram for the current module
+            // Retrieve and draw `hCalMapPos` histogram (x-y hits)
             TH2D* hCalMapPos = (TH2D*)inFile->Get(Form("hCalMapPos_module_%d", moduleID));
-            if (!hCalMapPos) {
-                std::cerr << "Error: Could not find hCalMapPos for module " << moduleID << " in file " << filename << std::endl;
-                continue;
-            }
+            if (hCalMapPos) {
+                hCalMapPos->GetXaxis()->SetTitle("X [cm]");
+                hCalMapPos->GetYaxis()->SetTitle("Y [cm]");
+                hCalMapPos->SetTitle("");
 
-            int entriesPos = hCalMapPos->GetEntries();
-            std::cout << "Drawing position histogram for module " << moduleID << ", Entries: " << entriesPos << std::endl;
-
-            if (entriesPos > 0) {
-                hCalMapPos->Draw("COLZ");  // Draw histogram with color palette
-                hCalMapPos->GetXaxis()->SetTitle("X");
-                hCalMapPos->GetYaxis()->SetTitle("Y");
-                //hCalMapPos->SetMarkerStyle(20);
-                //hCalMapPos->SetMarkerSize(0.2);
-                gPad->SetLogz(1);
+                if (firstPlotPos) {
+                    //hCalMapPos->SetTitle(Form("Combined 2D Histograms: x, y Hits and Crystal IDs for Run %d | Beam Energy: %.0f MeV", runNumber, beamEnergy));
+                    hCalMapPos->Draw("COLZ");  // Draw first position histogram with axes
+                    firstPlotPos = false;
+                } else {
+                    hCalMapPos->Draw("COLZ SAME");  // Overlay subsequent histograms
+                }
             } else {
-                std::cout << "Warning: Position histogram for module " << moduleID << " is empty." << std::endl;
+                std::cerr << "Warning: hCalMapPos for module " << moduleID << " not found in file " << filename << std::endl;
             }
-            //hCalMapPos->SetDirectory(0);
 
-            // Retrieve the 2D crystal ID histogram for the current module
+            // Retrieve and draw `hCalMapCrystalID` histogram (Crystal IDs)
             TH2D* hCalMapCrystalID = (TH2D*)inFile->Get(Form("hCalMapCrystalID_module_%d", moduleID));
-            if (!hCalMapCrystalID) {
-                std::cerr << "Error: Could not find hCalMapCrystalID for module " << moduleID << " in file " << filename << std::endl;
-                continue;
-            }
-
-            int entriesID = hCalMapCrystalID->GetEntries();
-
-            std::cout << "Drawing crystalID histogram for module " << moduleID << ", Entries: " << entriesID << std::endl;
-            hCalMapCrystalID->SetMinimum(0);  //the 0 value has to be displayed, it would be neglected instead
-            gStyle->SetPaintTextFormat("1.0f");  // Format to display even small values like 0
-            if (entriesID > 0) {
-                hCalMapCrystalID->Draw("TEXT SAME");
-                hCalMapCrystalID->GetXaxis()->SetTitle("X");
-                hCalMapCrystalID->GetYaxis()->SetTitle("Y");
+            if (hCalMapCrystalID) {
+                hCalMapCrystalID->SetMinimum(0);  //the 0 value has to be displayed, it would be neglected instead
+                gStyle->SetPaintTextFormat("1.0f");  // Format to display even small values like 0
+                hCalMapCrystalID->SetTitle("");
                 hCalMapCrystalID->SetMarkerStyle(20);
-                hCalMapCrystalID->SetMarkerSize(1.2);
+                hCalMapCrystalID->SetMarkerSize(1.2);  // Adjust marker size for clarity
+
+                hCalMapCrystalID->Draw("TEXT SAME");  // Directly overlay the text histogram
             } else {
-                std::cout << "Warning: CrystalID histogram for module " << moduleID << " is empty." << std::endl;
+                std::cerr << "Warning: hCalMapCrystalID for module " << moduleID << " not found in file " << filename << std::endl;
             }
-            //hCalMapCrystalID->SetDirectory(0);
 
-
-            index += 1;
         }
 
-        // Update and save the canvases
-        c1->cd();
+        // Use TLatex to add a visible title at the top of the canvas
+        TLatex* title = new TLatex();
+        title->SetNDC();  // Use normalized device coordinates (from 0 to 1)
+        title->SetTextAlign(22);  // Center-align the title
+        title->SetTextSize(0.03);  // Adjust text size
+        title->DrawLatex(0.5, 0.93, Form("Combined 2D Histograms: x, y Hits and Crystal IDs for Run %d | Beam Energy: %.0f MeV", runNumber, beamEnergy));
         c1->Modified();
         c1->Update();
-        c1->SaveAs(Form("Plots/CaloModules_Run_%d.png", runNumber));
+        c1->SaveAs(Form("Plots/CombinedCaloModules_Run_%d.png", runNumber));
 
-        // Close the input file after processing
         inFile->Close();
         delete inFile;
     }
