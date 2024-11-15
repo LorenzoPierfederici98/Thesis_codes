@@ -4,6 +4,7 @@
 //{180, 200, 220} being the vector of energy values and 1 the crystalID.
 
 #include <TFile.h>
+#include <TF1.h>
 #include <TFitResult.h>
 #include <TCanvas.h>
 #include <TGraphErrors.h>
@@ -19,6 +20,20 @@ std::string ConvertFileNumbersToString(const std::vector<int>& energies) {
         }
     }
     return ss.str();
+}
+
+pair<double, double> RoundMeasurement(double value, double uncertainty){
+    //Get the order of magnitude of the uncertainty
+    int significantFigures = (int)std::ceil(-std::log10(uncertainty)) + 1;
+
+    //Calculate the rounding factor based on significant figures
+    double roundingFactor = std::pow(10, significantFigures);
+
+    //Round the uncertainty and value accordingly
+    double roundedUncertainty = std::round(uncertainty * roundingFactor) / roundingFactor;
+    double roundedValue = std::round(value * roundingFactor) / roundingFactor;
+
+    return {roundedValue, roundedUncertainty};
 }
 
 void CaloPeakEnergyDisplay(const std::vector<int> &energies, const int crystalID) {
@@ -58,17 +73,39 @@ void CaloPeakEnergyDisplay(const std::vector<int> &energies, const int crystalID
         inFile->Close();
     }
 
+
+
     // Customize the graph
     graph->SetTitle(Form("Beam Energies HE: %s MeV | Crystal ID: %d", energiesStr.c_str(), crystalID));
     graph->SetMarkerStyle(24);
     graph->SetMarkerSize(1.2);
-    graph->GetXaxis()->SetTitle("Primary beam energy [MeV]");
-    graph->GetYaxis()->SetTitle("Mean charge");
+    graph->GetXaxis()->SetTitle("Beam Energy [MeV]");
+    graph->GetYaxis()->SetTitle("Mean Charge [a.u]");
     double x_max = graph->GetXaxis()->GetXmax();
+
+    TF1 *f1 = new TF1("f1", "pol1", 0., x_max);
+    TFitResultPtr fitresult = graph->Fit(f1, "S0");
+
+    auto [intercept, sigma_intercept] = RoundMeasurement(fitresult->Parameter(0), fitresult->ParError(0));
+    auto [slope, sigma_slope] = RoundMeasurement(fitresult->Parameter(1), fitresult->ParError(1));
+    double chi2 = fitresult->Chi2();
+    int ndf = fitresult->Ndf();
+
+    TPaveText *fitInfo = new TPaveText(0.15, 0.7, 0.45, 0.85, "NDC"); // coordinates in NDC
+    fitInfo->SetFillColor(0);
+    fitInfo->AddText(Form("intercept [a.u] = %f#pm %f", intercept, sigma_intercept));
+    fitInfo->AddText(Form("slope [a.u / MeV] = %f#pm %f", slope, sigma_slope));
+    fitInfo->AddText(Form("#chi^{2} / ndf = %.2f / %d", chi2, ndf));
+    fitInfo->SetTextSize(0.02);
+
+    f1->SetParameter(0, intercept);
+    f1->SetParameter(1, slope);
     // Draw the graph after the loop
-    graph->Draw("AP");
+    graph->SetMinimum(0.0);
     graph->GetXaxis()->SetLimits(0., x_max);
-    graph->GetYaxis()->SetLimits(0., 0.6);
+    graph->Draw("AP");
+    f1->Draw("same");
+    fitInfo->Draw();
     gPad->Modified();
     gPad->Update();
     

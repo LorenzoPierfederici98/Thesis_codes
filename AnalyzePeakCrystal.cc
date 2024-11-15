@@ -1,5 +1,5 @@
 //Macro that computes the sum and fits the 1D charge histograms for a given crystal of the calorimeter.
-//The histograms are retireved form the AnaLizeFOOT.cc root output files and are summed.
+//The histograms are retireved form the AnaLyzeCalo.cc root output files and are summed.
 //The user provides the run numbers (all of them must have the same energy) and the crystal ID.
 //To be run with e.g.  root -l -q 'AnalyzePeakCrystal.cc({4742, 4743, 4743, 4744, 4745, 4828}, 1, x_min, x_max)',
 //all the runs having the same energy, 1 is the crystal ID, x_min and x_max define the range surrounding the peak.
@@ -141,6 +141,11 @@ Double_t RetrieveEnergy(int runNumber, TFile* inFile) {
     if (!obj) {
         std::cerr << "Error: Could not retrieve 'BeamEnergyInfo' from file for run " << runNumber << std::endl;
         return -1;  // Return a default invalid value
+    }
+
+    if (runNumber == 4723 || runNumber == 4725 || runNumber == 4726){
+        Double_t beamEnergy = 180.0;
+        return beamEnergy;
     }
 
     // Check if the retrieved object is a TObjString
