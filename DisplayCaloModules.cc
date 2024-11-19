@@ -95,6 +95,7 @@ void DisplayCaloModules(const vector<int> &fileNumbers) {
 
         }
 
+
         // Use TLatex to add a visible title at the top of the canvas
         TLatex* title = new TLatex();
         title->SetNDC();  // Use normalized device coordinates (from 0 to 1)

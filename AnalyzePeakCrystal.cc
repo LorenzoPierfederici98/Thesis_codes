@@ -143,11 +143,6 @@ Double_t RetrieveEnergy(int runNumber, TFile* inFile) {
         return -1;  // Return a default invalid value
     }
 
-    if (runNumber == 4723 || runNumber == 4725 || runNumber == 4726){
-        Double_t beamEnergy = 180.0;
-        return beamEnergy;
-    }
-
     // Check if the retrieved object is a TObjString
     if (obj->InheritsFrom(TObjString::Class())) {
         TObjString* energyObj = (TObjString*)obj;

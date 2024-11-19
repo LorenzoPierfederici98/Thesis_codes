@@ -135,7 +135,24 @@ void AnalyzeCalo(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t ne
 
   printf("Total Entries to be processed::%d\n\n", (int)nentries);
 
-  string beamEnergyStr = to_string(parGeo->GetBeamPar().Energy * 1000);
+  string beamEnergyStr;
+
+  if (runNumber == 4723 || runNumber == 4725 || runNumber == 4726 || runNumber == 4628){
+    beamEnergyStr = to_string(180.0);
+  }
+  else if (runNumber == 4727 || runNumber == 4728){
+    beamEnergyStr = to_string(140.0);
+  }
+  else if (runNumber == 4624){
+    beamEnergyStr = to_string(110.0);
+    }
+  else if (runNumber == 4625){
+    beamEnergyStr = to_string(130.0);
+  }
+  else {
+    beamEnergyStr = to_string(parGeo->GetBeamPar().Energy * 1000);
+  }
+
   TObjString objString(beamEnergyStr.c_str());
   TObjString materialObj(parGeo->GetBeamPar().Material);
   fout->cd();
@@ -190,7 +207,7 @@ void AnalyzeCalo(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t ne
       Charge_Calo_crystal[crystal_id]->Fill(charge_calo);
       Charge_Calo_Module[ModuleID]->Fill(charge_calo);
 
-      // Fill the histogram with the usual values (crystalID)
+      // Fill the histogram with the usual values (e.g., charge)
       hCalMapPos[ModuleID]->Fill(CaloPosition.X(), CaloPosition.Y());
       double valueToSet = (crystal_id == 0) ? 0.0001 : static_cast<double>(crystal_id);
       hCalMapCrystalID[ModuleID]->SetBinContent(

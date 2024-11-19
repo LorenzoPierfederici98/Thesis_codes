@@ -1,6 +1,6 @@
 //Macro that plots the charge given by the fit performed in AnalyzePeakCrystal.cc in a
 //single crystal vs the beam energy. The fit results are stored in root files, named like
-//Fit_Calo_Crystal_1_Energy_200MeV.root. To be run with root -l 'CaloPeakEnergyDisplay({180, 200, 220}, 1)'
+//Fit_Calo_Crystal_1_Energy_200MeV.root. To be run with root -l 'CaloPeakEnergyDisplay.cc({180, 200, 220}, 1)'
 //{180, 200, 220} being the vector of energy values and 1 the crystalID.
 
 #include <TFile.h>
