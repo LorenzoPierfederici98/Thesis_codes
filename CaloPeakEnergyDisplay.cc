@@ -45,7 +45,7 @@ void CaloPeakEnergyDisplay(const std::vector<int> &energies, const int crystalID
 
     int pointIndex = 0;
     for(int energy : energies) {
-        TString filename = Form("Fit_Calo_Crystal_%d_Energy_%dMeV.root", crystalID, energy);
+        TString filename = Form("FitCalo/Fit_Calo_Crystal_%d_Energy_%dMeV.root", crystalID, energy);
         TFile *inFile = TFile::Open(filename);
 
         if (!inFile || inFile->IsZombie()) {

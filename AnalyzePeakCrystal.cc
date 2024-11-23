@@ -47,6 +47,7 @@ void AnalyzePeakCrystal(const vector<int> &fileNumbers, const int crystal_ID, co
     }
     c1->SetTitle(Form("Run Numbers: %s | Beam Energy: %.0f MeV | Crystal ID: %d", fileNumbersStr.c_str(), beamEnergy, crystal_ID));
 
+    TH1D* Charge_Calo_fullrange = (TH1D*)Charge_Calo_crystal->Clone("Charge_Calo_fullrange"); // Clone the full-range histogram
     Charge_Calo_crystal->GetXaxis()->SetRangeUser(x_min, x_max);
 
     TFitResultPtr c = FitPeakWithTSpectrum(Charge_Calo_crystal, 0.4);
@@ -65,8 +66,8 @@ void AnalyzePeakCrystal(const vector<int> &fileNumbers, const int crystal_ID, co
     // Pause for the user to view each plot (optional)
     //gPad->WaitPrimitive(); // Uncomment to wait for user input before moving to the next plot
 
-    const TString outFile = Form("Fit_Calo_Crystal_%d_Energy_%.0fMeV.root", crystal_ID, beamEnergy);
-    SaveFitResultsToFile(c1, Charge_Calo_crystal, c, outFile, fileNumbersStr);
+    const TString outFile = Form("FitCalo/Fit_Calo_Crystal_%d_Energy_%.0fMeV.root", crystal_ID, beamEnergy);
+    SaveFitResultsToFile(c1, Charge_Calo_fullrange, c, outFile, fileNumbersStr);
     delete c1;
 }
 
@@ -216,6 +217,7 @@ void SaveFitResultsToFile(TCanvas* canvas, TH1D* hist, TFitResultPtr fitResult, 
     canvas->cd();
     gPad->SetLogy();
     canvas->Update();
+    hist->Write(Form("Full range histogram runs: %s", fileNumbersStr.Data()));
     canvas->Write(outputFileName);         // Save the histogram
 
     // Write the run numbers as a TObjString
