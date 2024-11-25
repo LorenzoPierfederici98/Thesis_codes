@@ -1,9 +1,14 @@
-//Macro that computes the sum and fits the 1D charge histograms for a given crystal of the calorimeter.
-//The histograms are retireved form the AnaLyzeCalo.cc root output files and are summed.
-//The user provides the run numbers (all of them must have the same energy) and the crystal ID.
-//To be run with e.g.  root -l -q 'AnalyzePeakCrystal.cc({4742, 4743, 4743, 4744, 4745, 4828}, 1, x_min, x_max)',
-//all the runs having the same energy, 1 is the crystal ID, x_min and x_max define the range surrounding the peak.
-//The fit results are inserted in files namekd like e.g. Fit_Calo_Crystal_1_Energy_200MeV.root
+//Macro that computes the sum and fits the 1D charge histograms for every crystal of the calorimeter.
+//The histograms are retireved from the AnaLyzeCalo.cc root output files and are summed.
+//The user provides the run numbers (all of them must have the same energy), the macro then sums
+//all the histograms of every crystalID and of the total calorimeter of every run; the fit on a summed
+//histogram for a certain crystalID is performed only if its entries are grater than thresh=0.002 times
+//the entries of the total summed histogram of the calorimeter.
+
+//To be run with e.g.  root -l -q 'AnalyzePeakCrystal.cc({4742, 4743, 4743, 4744, 4745, 4828}, x_min, x_max)',
+//all the runs having the same energy, x_min and x_max define the range surrounding the peak.
+//The fit results are inserted in files namekd like e.g. Fit_Calo_Crystal_1_Energy_200MeV.root, the 1 being the
+//crystalID.
 
 #include <TFile.h>
 #include <TCanvas.h>
@@ -23,52 +28,66 @@ TFitResultPtr FitPeakWithTSpectrum(TH1D *hist, double threshold);
 
 Double_t RetrieveEnergy(int runNumber, TFile* inFile);
 
-pair<TH1D*, Double_t> SumHistograms(const std::vector<int>& fileNumbers, const TString& histName);
+std::tuple<TH1D*, TH1D*, Double_t> SumHistograms(const std::vector<int>& fileNumbers, const TString& histName_total, const TString& histName);
 
 std::string ConvertFileNumbersToString(const std::vector<int>& fileNumbers);
 
 void SaveFitResultsToFile(TCanvas* canvas, TH1D* hist, TFitResultPtr fitResult, const TString& outputFileName, const TString& fileNumbersStr);
 
-void AnalyzePeakCrystal(const vector<int> &fileNumbers, const int crystal_ID, const double x_min, const double x_max) {
+void AnalyzePeakCrystal(const vector<int> &fileNumbers, const double x_min, const double x_max) {
 
-    TCanvas* c1 = new TCanvas("c1", Form("Fit Results"), 800, 600);
     std::string fileNumbersStr = ConvertFileNumbersToString(fileNumbers);
 
-    const TString histName = Form("Charge_Calo_crystalId_%d", crystal_ID);
-    auto [Charge_Calo_crystal, beamEnergy] = SumHistograms(fileNumbers, histName);
+    for (int crystal_ID = 1; crystal_ID < 63; crystal_ID++){
+        TCanvas* c1 = new TCanvas("c1", Form("Fit Results"), 800, 600);
+        const TString histName = Form("Charge_Calo_crystalId_%d", crystal_ID);
+        const TString histName_total = Form("Charge_Calo");
+        auto [Charge_Calo_crystal, Charge_Calo, beamEnergy] = SumHistograms(fileNumbers, histName_total, histName);
 
-    if (!Charge_Calo_crystal || Charge_Calo_crystal->GetEntries() == 0) {
-        std::cerr << "Warning: Sum Histogram is empty" << std::endl;
-        return;
+        if (!Charge_Calo_crystal || Charge_Calo_crystal->GetEntries() == 0 || !Charge_Calo || Charge_Calo->GetEntries() == 0) {
+            std::cerr << "Warning: Sum Histogram is empty" << std::endl;
+            continue;
         }
-    if (beamEnergy == -1){
-        std::cerr << "Invalid energy value" << std::endl;
-        return;
+        if (beamEnergy == -1){
+            std::cerr << "Invalid energy value" << std::endl;
+            continue;
+        }
+        cout << "crystal ID: " << crystal_ID << " sum hist entries / total entries: " << Charge_Calo_crystal->GetEntries()/Charge_Calo->GetEntries() << endl;
+        double thresh = 0.002;
+        if (Charge_Calo_crystal->GetEntries() > thresh * Charge_Calo->GetEntries()){
+            c1->SetTitle(Form("Run Numbers: %s | Beam Energy: %.0f MeV | Crystal ID: %d", fileNumbersStr.c_str(), beamEnergy, crystal_ID));
+
+            TH1D* Charge_Calo_fullrange = (TH1D*)Charge_Calo_crystal->Clone("Charge_Calo_fullrange"); // Clone the full-range histogram
+            if (crystal_ID == 4){
+                Charge_Calo_crystal->GetXaxis()->SetRangeUser(0.2, 0.4);
+            }
+            else {
+                Charge_Calo_crystal->GetXaxis()->SetRangeUser(x_min, x_max);
+            }
+
+            TFitResultPtr c = FitPeakWithTSpectrum(Charge_Calo_crystal, 0.3);
+            if (!c.Get()) {
+                std::cerr << "Fit failed for run " << std::endl;
+                continue;
+            } else {
+                // If fit is successful, print the results
+                std::cout << "Beam energy: " << beamEnergy << " MeV ";
+                PrintMeasurement(c->Parameter(1), c->ParError(1));
+            }
+
+            // Update and save the canvas
+            //c1->Update();
+            //TString outputImage = Form("fit_run%d_crystal%d.png", runNumber, crystal_ID);
+            //c1->SaveAs(outputImage);
+            // Pause for the user to view each plot (optional)
+            //gPad->WaitPrimitive(); // Uncomment to wait for user input before moving to the next plot
+
+            const TString outFile = Form("FitCalo/Fit_Calo_Crystal_%d_Energy_%.0fMeV.root", crystal_ID, beamEnergy);
+            SaveFitResultsToFile(c1, Charge_Calo_fullrange, c, outFile, fileNumbersStr);
+        }
+        delete c1;
     }
-    c1->SetTitle(Form("Run Numbers: %s | Beam Energy: %.0f MeV | Crystal ID: %d", fileNumbersStr.c_str(), beamEnergy, crystal_ID));
-
-    TH1D* Charge_Calo_fullrange = (TH1D*)Charge_Calo_crystal->Clone("Charge_Calo_fullrange"); // Clone the full-range histogram
-    Charge_Calo_crystal->GetXaxis()->SetRangeUser(x_min, x_max);
-
-    TFitResultPtr c = FitPeakWithTSpectrum(Charge_Calo_crystal, 0.4);
-    if (c->Status() != 0) {
-        std::cerr << "Fit failed for run " << std::endl;
-    } else {
-        // If fit is successful, print the results
-        std::cout << "Beam energy: " << beamEnergy << " MeV ";
-        PrintMeasurement(c->Parameter(1), c->ParError(1));
-    }
-
-    // Update and save the canvas
-    //c1->Update();
-    //TString outputImage = Form("fit_run%d_crystal%d.png", runNumber, crystal_ID);
-    //c1->SaveAs(outputImage);
-    // Pause for the user to view each plot (optional)
-    //gPad->WaitPrimitive(); // Uncomment to wait for user input before moving to the next plot
-
-    const TString outFile = Form("FitCalo/Fit_Calo_Crystal_%d_Energy_%.0fMeV.root", crystal_ID, beamEnergy);
-    SaveFitResultsToFile(c1, Charge_Calo_fullrange, c, outFile, fileNumbersStr);
-    delete c1;
+    return;
 }
 
 void PrintMeasurement(double value, double uncertainty) {
@@ -155,8 +174,9 @@ Double_t RetrieveEnergy(int runNumber, TFile* inFile) {
     }
 }
 
-pair<TH1D*, Double_t> SumHistograms(const std::vector<int>& fileNumbers, const TString& histName) {
+std::tuple<TH1D*, TH1D*, Double_t> SumHistograms(const std::vector<int>& fileNumbers, const TString& histName_total, const TString& histName) {
     TH1D* summedHist = nullptr;
+    TH1D* summedHist_total = nullptr;
     Double_t beamEnergy = 0;  // Store the energy value
     
     // Loop over all file numbers
@@ -173,8 +193,16 @@ pair<TH1D*, Double_t> SumHistograms(const std::vector<int>& fileNumbers, const T
         }
 
         TH1D* hist = (TH1D*)inFile->Get(histName);
-        if (!hist) {
-            std::cerr << "Error: Could not find histogram " << histName << std::endl;
+        TH1D* hist_total = (TH1D*)inFile->Get(histName_total);
+
+        if (!hist || hist->GetEntries() == 0) {
+            std::cerr << "Error: Could not find histogram or it is empty " << histName << std::endl;
+            inFile->Close();
+            continue;
+        }
+
+        if (!hist_total || hist_total->GetEntries() == 0) {
+            std::cerr << "Error: Could not find total crystals histogram or it is empty " << histName_total << std::endl;
             inFile->Close();
             continue;
         }
@@ -186,10 +214,17 @@ pair<TH1D*, Double_t> SumHistograms(const std::vector<int>& fileNumbers, const T
             summedHist->Add(hist);
         }
 
+        if (!summedHist_total) {
+            summedHist_total = (TH1D*)hist_total->Clone();
+            summedHist_total->SetDirectory(0);
+        } else {
+            summedHist_total->Add(hist_total);
+        }
+
         inFile->Close();
     }
 
-    return {summedHist, beamEnergy};
+    return {summedHist, summedHist_total, beamEnergy};
 }
 
 

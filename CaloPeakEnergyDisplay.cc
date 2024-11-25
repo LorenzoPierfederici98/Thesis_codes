@@ -1,7 +1,8 @@
-//Macro that plots the charge given by the fit performed in AnalyzePeakCrystal.cc in a
-//single crystal vs the beam energy. The fit results are stored in root files, named like
-//Fit_Calo_Crystal_1_Energy_200MeV.root. To be run with root -l 'CaloPeakEnergyDisplay.cc({180, 200, 220}, 1)'
-//{180, 200, 220} being the vector of energy values and 1 the crystalID.
+//Macro that plots the charge given by the fit performed in AnalyzePeakCrystal.cc in all
+//the available crystals vs the beam energy. The fit results are stored in root files, named like
+//Fit_Calo_Crystal_1_Energy_200MeV.root. To be run with root -l 'CaloPeakEnergyDisplay.cc({180, 200, 220})'
+//{180, 200, 220} being the vector of energy values, it loops on every crystalID and extracts the fit
+//values only on the available IDs.
 
 #include <TFile.h>
 #include <TF1.h>
@@ -36,82 +37,103 @@ pair<double, double> RoundMeasurement(double value, double uncertainty){
     return {roundedValue, roundedUncertainty};
 }
 
-void CaloPeakEnergyDisplay(const std::vector<int> &energies, const int crystalID) {
-    TCanvas *canvas = new TCanvas("canvas", "Calo Fit Results vs Energies", 800, 600);
+void CaloPeakEnergyDisplay(const std::vector<int> &energies) {
     std::string energiesStr = ConvertFileNumbersToString(energies);
-    canvas->SetTitle(Form("Beam Energies HE: %s MeV | Crystal ID: %d", energiesStr.c_str(), crystalID));
 
-    TGraphErrors *graph = new TGraphErrors();  // Create a single graph to accumulate points
+    for (int crystalID = 0; crystalID < 63; crystalID++) {
+        TCanvas *canvas = new TCanvas("canvas", "Calo Fit Results vs Energies", 800, 600);
 
-    int pointIndex = 0;
-    for(int energy : energies) {
-        TString filename = Form("FitCalo/Fit_Calo_Crystal_%d_Energy_%dMeV.root", crystalID, energy);
-        TFile *inFile = TFile::Open(filename);
+        TGraphErrors *graph = new TGraphErrors();
+        int pointIndex = 0;
 
-        if (!inFile || inFile->IsZombie()) {
-            std::cerr << "Error: Could not open file " << filename << std::endl;
-            continue;
-        }
+        for (int energy : energies) {
+            TString filename = Form("FitCalo/Fit_Calo_Crystal_%d_Energy_%dMeV.root", crystalID, energy);
+            TFile *inFile = TFile::Open(filename);
 
-        TFitResult *fitresult = (TFitResult *)inFile->Get("Fit_Results");
+            if (!inFile || inFile->IsZombie()) {
+                std::cerr << "Error: Could not open file " << filename << std::endl;
+                if (inFile) inFile->Close(); // Ensure file is closed if it exists
+                continue;
+            }
 
-        if (!fitresult) {
-            std::cerr << Form("Fit result for energy %d not present", energy) << std::endl;
+            TFitResult *fitresult = (TFitResult *)inFile->Get("Fit_Results");
+            if (!fitresult) {
+                std::cerr << "Warning: Fit results not found in file " << filename << std::endl;
+                inFile->Close();
+                continue;
+            }
+
+            // Retrieve mean charge and error
+            Double_t mean_charge = fitresult->Parameter(1);
+            Double_t mean_charge_error = fitresult->ParError(1);
+
+            std::cout << "Crystal " << crystalID << ", Energy " << energy 
+                      << " MeV: Mean Charge = " << mean_charge 
+                      << " ± " << mean_charge_error << std::endl;
+
+            // Add point to the graph
+            graph->SetPoint(pointIndex, energy, mean_charge);
+            graph->SetPointError(pointIndex, 0, mean_charge_error);
+
+            ++pointIndex;
             inFile->Close();
+        }
+
+        if (graph->GetN() == 0) {
+            std::cerr << "No valid points for crystal " << crystalID << std::endl;
+            delete graph;
+            delete canvas;
             continue;
         }
 
-        // Retrieve mean charge and error from the fit result
-        Double_t mean_charge = fitresult->Parameter(1);
-        Double_t mean_charge_error = fitresult->ParError(1);
+        // Customize the graph
+        graph->SetTitle(Form("Beam Energies HE: %s MeV | Crystal ID: %d", energiesStr.c_str(), crystalID));
+        graph->SetMarkerStyle(24);
+        graph->SetMarkerSize(1.2);
+        graph->GetXaxis()->SetTitle("Beam Energy [MeV]");
+        graph->GetYaxis()->SetTitle("Mean Charge [a.u.]");
+        graph->SetMinimum(0.0);
+        double x_max = graph->GetXaxis()->GetXmax();
 
-        // Set the points in the graph
-        graph->SetPoint(pointIndex, energy, mean_charge);
-        graph->SetPointError(pointIndex, 0, mean_charge_error);
+        // Perform linear fit
+        TF1 *f1 = new TF1("f1", "pol1", 0., graph->GetXaxis()->GetXmax());
+        TFitResultPtr fitresult_linear = graph->Fit(f1, "S");
 
-        ++pointIndex;
-        inFile->Close();
+        if (!fitresult_linear.Get() || fitresult_linear->Status() != 0) {
+            std::cerr << "Linear fit failed for crystal " << crystalID << std::endl;
+        } else {
+            auto [intercept, sigma_intercept] = RoundMeasurement(fitresult_linear->Parameter(0), fitresult_linear->ParError(0));
+            auto [slope, sigma_slope] = RoundMeasurement(fitresult_linear->Parameter(1), fitresult_linear->ParError(1));
+            double chi2 = fitresult_linear->Chi2();
+            int ndf = fitresult_linear->Ndf();
+
+            TPaveText *fitInfo = new TPaveText(0.3, 0.7, 0.45, 0.85, "NDC");
+            fitInfo->SetFillColor(0);
+            fitInfo->AddText(Form("Intercept [a.u.] = %f#pm %f", intercept, sigma_intercept));
+            fitInfo->AddText(Form("Slope [a.u. / MeV] = %f#pm %f", slope, sigma_slope));
+            fitInfo->AddText(Form("#chi^{2} / ndf = %.2f / %d", chi2, ndf));
+            fitInfo->SetTextSize(0.03);
+
+            graph->GetXaxis()->SetLimits(0., x_max);
+
+            f1->SetParameter(0, intercept);
+            f1->SetParameter(1, slope);
+
+            // Draw fit info
+            graph->Draw("AP");
+            f1->Draw("same");
+            canvas->cd();
+            fitInfo->Draw("same");
+            canvas->Modified();
+            canvas->Update();
+            canvas->SaveAs(Form("Plots/Calo_FitCharge_Energy_Crystal_%d.png", crystalID));
+
+            delete fitInfo;
+        }
+
+        delete f1;
+        delete graph;
+        delete canvas;
     }
-
-
-
-    // Customize the graph
-    graph->SetTitle(Form("Beam Energies HE: %s MeV | Crystal ID: %d", energiesStr.c_str(), crystalID));
-    graph->SetMarkerStyle(24);
-    graph->SetMarkerSize(1.2);
-    graph->GetXaxis()->SetTitle("Beam Energy [MeV]");
-    graph->GetYaxis()->SetTitle("Mean Charge [a.u]");
-    double x_max = graph->GetXaxis()->GetXmax();
-
-    TF1 *f1 = new TF1("f1", "pol1", 0., x_max);
-    TFitResultPtr fitresult = graph->Fit(f1, "S0");
-
-    auto [intercept, sigma_intercept] = RoundMeasurement(fitresult->Parameter(0), fitresult->ParError(0));
-    auto [slope, sigma_slope] = RoundMeasurement(fitresult->Parameter(1), fitresult->ParError(1));
-    double chi2 = fitresult->Chi2();
-    int ndf = fitresult->Ndf();
-
-    TPaveText *fitInfo = new TPaveText(0.15, 0.7, 0.45, 0.85, "NDC"); // coordinates in NDC
-    fitInfo->SetFillColor(0);
-    fitInfo->AddText(Form("intercept [a.u] = %f#pm %f", intercept, sigma_intercept));
-    fitInfo->AddText(Form("slope [a.u / MeV] = %f#pm %f", slope, sigma_slope));
-    fitInfo->AddText(Form("#chi^{2} / ndf = %.2f / %d", chi2, ndf));
-    fitInfo->SetTextSize(0.02);
-
-    f1->SetParameter(0, intercept);
-    f1->SetParameter(1, slope);
-    // Draw the graph after the loop
-    graph->SetMinimum(0.0);
-    graph->GetXaxis()->SetLimits(0., x_max);
-    graph->Draw("AP");
-    f1->Draw("same");
-    fitInfo->Draw();
-    gPad->Modified();
-    gPad->Update();
-    
-    // Save the canvas as a PNG image
-    canvas->SaveAs(Form("Plots/Calo_FitCharge_Energy_Crystal_%d.png", crystalID));
-
-    delete graph;
-    delete canvas;
 }
+
