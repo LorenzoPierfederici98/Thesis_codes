@@ -39,8 +39,8 @@ void AnalyzeTWFit(const vector<int> &fileNumbers){
     TString suffix_fit = "_Fit.root";
     TString fitresult = "FitResult_";
     TString fitcharge = "Charge_";
-    vector<TString> layer = {"layer0_", "layer1_"};
-    vector<TString> bar = {"bar0", "bar1", "bar2", "bar3", "bar4", "bar5", "bar6", "bar7", "bar8", "bar9", "bar10", "bar11", "bar12", "bar13", "bar14", "bar15", "bar16", "bar17", "bar18", "bar19"};
+    //vector<TString> layer = {"layer0_", "layer1_"};
+    //vector<TString> bar = {"bar0", "bar1", "bar2", "bar3", "bar4", "bar5", "bar6", "bar7", "bar8", "bar9", "bar10", "bar11", "bar12", "bar13", "bar14", "bar15", "bar16", "bar17", "bar18", "bar19"};
 
     // Separate storage for "HE", "H", and "C"
     FitData heData, hData, cData;
