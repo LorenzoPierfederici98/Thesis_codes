@@ -155,9 +155,13 @@ void AnalyzeCalo(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t ne
 
   TObjString objString(beamEnergyStr.c_str());
   TObjString materialObj(parGeo->GetBeamPar().Material);
+  TObjString nentriesObj(to_string(nentries).c_str());
+
   fout->cd();
-  objString.Write("BeamEnergyInfo"); // Write the primary beam energy and type of particle in the fit file
-  materialObj.Write("IonInfo");
+  // Check if the object already exists
+  objString.Write(Form("BeamEnergyInfo run %d", runNumber));
+  materialObj.Write(Form("IonInfo run %d", runNumber));
+  nentriesObj.Write(Form("nentries run %d", runNumber));
 
   // Loop over the TTree
   gTAGroot.BeginEventLoop();
@@ -270,8 +274,8 @@ void BookHistograms()
   }
   for(int imodule=0; imodule < kModules; imodule++)
   {
-    hCalMapPos[imodule] = new TH2D(Form("hCalMapPos_module_%d", modules[imodule]), Form("hCalMapPos_module_%d", modules[imodule]), 27, -27., 27., 27, -27., 27.);
-    hCalMapCrystalID[imodule] = new TH2D(Form("hCalMapCrystalID_module_%d", modules[imodule]), Form("hCalMapCrystalID_module_%d", modules[imodule]), 27, -27., 27., 27, -27., 27.);
+    hCalMapPos[imodule] = new TH2D(Form("hCalMapPos_module_%d", modules[imodule]), Form("hCalMapPos_module_%d", modules[imodule]), 27, -27., 27., 11, -11., 11.);
+    hCalMapCrystalID[imodule] = new TH2D(Form("hCalMapCrystalID_module_%d", modules[imodule]), Form("hCalMapCrystalID_module_%d", modules[imodule]), 27, -27., 27., 11, -11., 11.);
     Charge_Calo_Module[imodule] = new TH1D(Form("Charge_Calo_Module_%d", modules[imodule]), Form("Charge_Calo_Module_%d", modules[imodule]), 200, 0., 1.);
   }
 

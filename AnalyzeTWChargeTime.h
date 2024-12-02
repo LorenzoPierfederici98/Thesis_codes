@@ -221,6 +221,7 @@ TH2D *hTwMapPos_1Cross;
 TH1D *hResX_1Cross;
 TH1D *hResY_1Cross;
 TH2D *hBarID_1Cross;
+TH2D *Charge_vs_tof;
 
 
 void  InitializeContainers();

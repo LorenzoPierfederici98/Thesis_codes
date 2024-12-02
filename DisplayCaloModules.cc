@@ -1,62 +1,31 @@
-//Macro that plots the 2D histograms of x-y hit coordinates in the calorimeter.
-//Histograms are retireved form the AnaLizeFOOT.cc root files output.
-//To be run with root -l 'DisplayCaloModules.cc({4742, 4743, 4744, 4745, 4828})'
+// Macro that plots the 2D histograms of x-y hit coordinates in the calorimeter.
+// Histograms are retireved form the AnaLizeFOOT.cc root merged files output.
+// To be run with root -l -b -q 'DisplayCaloModules.cc()'
 
-#include <TFile.h>      // For opening ROOT files
-#include <TCanvas.h>    // For creating and handling canvases
-#include <TH2D.h>       // For handling 2D histograms
-#include <TLegend.h>    // For legends (optional, only if needed)
-#include <iostream>     // For input/output operations (std::cerr)
+#include "DisplayCaloModules.h"
 
-Double_t RetrieveEnergy(int runNumber, TFile* inFile) {
-    if (!inFile) {
-        std::cerr << "Error: Input file is null for run " << runNumber << std::endl;
-        return -1;  // Return a default invalid value
-    }
-
-    TObject* obj = inFile->Get("BeamEnergyInfo");
-    
-    if (!obj) {
-        std::cerr << "Error: Could not retrieve 'BeamEnergyInfo' from file for run " << runNumber << std::endl;
-        return -1;  // Return a default invalid value
-    }
-
-    // Check if the retrieved object is a TObjString
-    if (obj->InheritsFrom(TObjString::Class())) {
-        TObjString* energyObj = (TObjString*)obj;
-        Double_t beamEnergy = energyObj->GetString().Atof();
-        return beamEnergy;
-    } else {
-        std::cerr << "Error: 'BeamEnergyInfo' is not a TObjString for run " << runNumber << std::endl;
-        return -1;  // Return a default invalid value
-    }
-}
-
-std::string ConvertFileNumbersToString(const int& runNumber) {
-    std::stringstream ss;
-    ss << runNumber;
-    return ss.str();
-}
-
-
-void DisplayCaloModules(const vector<int> &fileNumbers) {
+void DisplayCaloModules() {
     int modules[7] = {7, 6, 5, 4, 3, 2, 1};  // List of modules
     gStyle->SetOptStat(0);  // Display histogram stats (name and entries)
+
+    std::vector<std::pair<std::string, double>> filesAndEnergies = {
+        {"Calo/AnaFOOT_Calo_Decoded_HIT2022_140MeV.root", 140},
+        {"Calo/AnaFOOT_Calo_Decoded_HIT2022_180MeV.root", 180},
+        {"Calo/AnaFOOT_Calo_Decoded_HIT2022_200MeV.root", 200},
+        {"Calo/AnaFOOT_Calo_Decoded_HIT2022_220MeV.root", 220}
+    };
     
     TCanvas* c1 = new TCanvas("c1", "Combined Display", 1200, 800);
     c1->SetRightMargin(0.15);  // Increase right margin to accommodate the color bar
     gPad->SetLogz(1);
     gStyle->SetPalette(1);
 
-    for (int runNumber : fileNumbers) {
-        TString filename = Form("Calo/AnaFOOT_Calo_Decoded_HIT2022_%d.root", runNumber);
-        TFile* inFile = new TFile(filename);
+    for (const auto &[fileName, beamEnergy] : filesAndEnergies) {
+        TFile* inFile = new TFile(fileName.c_str());
         if (!inFile || inFile->IsZombie()) {
-            std::cerr << "Error: Could not open file " << filename << std::endl;
+            std::cerr << "Error: Could not open file " << fileName << std::endl;
             return;
         }
-
-        Double_t beamEnergy = RetrieveEnergy(runNumber, inFile);
 
         bool firstPlotPos = true;
 
@@ -76,7 +45,7 @@ void DisplayCaloModules(const vector<int> &fileNumbers) {
                     hCalMapPos->Draw("COLZ SAME");  // Overlay subsequent histograms
                 }
             } else {
-                std::cerr << "Warning: hCalMapPos for module " << moduleID << " not found in file " << filename << std::endl;
+                std::cerr << "Warning: hCalMapPos for module " << moduleID << " not found in file " << fileName << std::endl;
             }
 
             // Retrieve and draw `hCalMapCrystalID` histogram (Crystal IDs)
@@ -90,7 +59,7 @@ void DisplayCaloModules(const vector<int> &fileNumbers) {
 
                 hCalMapCrystalID->Draw("TEXT SAME");  // Directly overlay the text histogram
             } else {
-                std::cerr << "Warning: hCalMapCrystalID for module " << moduleID << " not found in file " << filename << std::endl;
+                std::cerr << "Warning: hCalMapCrystalID for module " << moduleID << " not found in file " << fileName << std::endl;
             }
 
         }
@@ -101,10 +70,10 @@ void DisplayCaloModules(const vector<int> &fileNumbers) {
         title->SetNDC();  // Use normalized device coordinates (from 0 to 1)
         title->SetTextAlign(22);  // Center-align the title
         title->SetTextSize(0.03);  // Adjust text size
-        title->DrawLatex(0.5, 0.93, Form("Combined 2D Histograms: x, y Hits and Crystal IDs for Run %d | Beam Energy: %.0f MeV", runNumber, beamEnergy));
+        title->DrawLatex(0.5, 0.93, Form("Combined 2D Histograms: x, y Hits and Crystal IDs Beam Energy: %.0f MeV", beamEnergy));
         c1->Modified();
         c1->Update();
-        c1->SaveAs(Form("Plots/CombinedCaloModules_Run_%d.png", runNumber));
+        c1->SaveAs(Form("Plots/Merged_CombinedCaloModules_Energy_%.0f.png", beamEnergy));
 
         inFile->Close();
         delete inFile;

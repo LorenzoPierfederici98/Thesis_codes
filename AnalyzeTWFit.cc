@@ -1,343 +1,169 @@
-#include <vector>
-#include <TString.h>
-#include <TFile.h>
-#include <TH1D.h>
-#include <TFitResult.h>
-#include <TObjString.h>
-#include <TGraphErrors.h>
-#include <TCanvas.h>
-#include <TTree.h>
-#include <iostream>
-#include <map>
-#include <cmath>
-#include <TSystem.h>
-#include <set>
+// Macro that fits the charge distribution from the AnalyzeTWChargeTime.cc merged output files.
+// Only the histograms whose entries are greater than a fraction of the sum of the merged files
+// total entries are fitted. The fit results are stored in files name like e.g.
+// TW/AnaFOOT_TW_Decoded_HIT2022_140MeV_Fit.root. To be run with root -l -b -q 'AnalyzeTWFit.cc()'.
+// The mean charge values given by the fits are then plotted vs the beam energies, one plot for every
+// layer-bar combination.
 
-using namespace std;
+#include "AnalyzeTWFit.h"
 
-struct FitData {
-    int flag=0;
-    set<Double_t> energies;
-    map<TString, TH1D*> SumHisto;
-    map<TString, Double_t> fitMean;
-    map<TString, Double_t> fitMeanErr;
-    map<Double_t, vector<int>> runCombinations;
-    map<Double_t, vector<pair<TString, TString>>> validCombinations; // To store valid layer-bar combinations
-};
+// Main analysis function
+void AnalyzeTWFit() {
+    std::vector<std::pair<std::string, double>> filesAndEnergies = {
+        {"TW/AnaFOOT_TW_Decoded_HIT2022_140MeV.root", 140},
+        {"TW/AnaFOOT_TW_Decoded_HIT2022_180MeV.root", 180},
+        {"TW/AnaFOOT_TW_Decoded_HIT2022_200MeV.root", 200},
+        {"TW/AnaFOOT_TW_Decoded_HIT2022_220MeV.root", 220}
+    };
 
-void ProcessFile(const TString &fileName, const int runNumber, FitData &heData, FitData &hData, FitData &cData);
+    std::map<TString, std::map<int, double>> fitMeans;
+    std::map<TString, std::map<int, double>> fitErrors;
 
-void SumHistograms(const TString &fileName, const Double_t energy, const int runNumber, const TString &comboKey, FitData &Data);
-
-pair<Double_t, Double_t> PerformFit(FitData &Data, TString comboKey);
-
-void PlotChargeFitResults(const map<TString, pair<Double_t, Double_t>> &fitCharge, const TString &dataLabel);
-
-void AnalyzeTWFit(const vector<int> &fileNumbers){
-    TString baseName = "TW/AnaFOOT_TW_Decoded_HIT2022_";
-    TString suffix = ".root";
-    TString suffix_fit = "_Fit.root";
-    TString fitresult = "FitResult_";
-    TString fitcharge = "Charge_";
-    //vector<TString> layer = {"layer0_", "layer1_"};
-    //vector<TString> bar = {"bar0", "bar1", "bar2", "bar3", "bar4", "bar5", "bar6", "bar7", "bar8", "bar9", "bar10", "bar11", "bar12", "bar13", "bar14", "bar15", "bar16", "bar17", "bar18", "bar19"};
-
-    // Separate storage for "HE", "H", and "C"
-    FitData heData, hData, cData;
-
-    // Process files to populate FitData structures
-    for (int runNumber : fileNumbers) {
-        TString fileName = baseName + TString::Format("%d", runNumber) + suffix_fit;
-        ProcessFile(fileName, runNumber, heData, hData, cData);
+    for (const auto& [fileName, energy] : filesAndEnergies) {
+        ProcessFile(fileName, energy, fitMeans, fitErrors);
     }
 
-    if (heData.flag) {
-
-        map<TString, pair<Double_t, Double_t>> fitChargeHe;
-        // Loop over each energy
-        for (Double_t energy : heData.energies) {
-            // Loop over each layer-bar combination for the current energy
-            for (const auto& combination : heData.validCombinations[energy]) {
-                TString layer = combination.first; // Extract layer
-                TString bar = combination.second;  // Extract bar
-                // Create a unique key for this energy-layer-bar combination
-                TString comboKey = Form("SumHisto_%g_%s%s", energy, layer.Data(), bar.Data());
-
-                // Sum histograms for this combination across all runs
-                for (int runNumber : heData.runCombinations[energy]) {
-                    TString fileName = baseName + TString::Format("%d", runNumber) + suffix;
-                    SumHistograms(fileName, energy, runNumber, comboKey, heData);
-                }
-                // Perform the fit for this specific combination
-                fitChargeHe[comboKey] = PerformFit(heData, comboKey);
-            }
-        }
-
-        // Plot the charge fit results
-        PlotChargeFitResults(fitChargeHe, "HE");
+    for (const auto& layerBarEntry : fitMeans) {
+        CreateAndSaveGraph(layerBarEntry.first, layerBarEntry.second, fitErrors);
     }
-
-    if (hData.flag) {
-
-        map<TString, pair<Double_t, Double_t>> fitChargeH;
-        // Loop over each energy
-        for (Double_t energy : heData.energies) {
-            // Loop over each layer-bar combination for the current energy
-            for (const auto& combination : heData.validCombinations[energy]) {
-                TString layer = combination.first; // Extract layer
-                TString bar = combination.second;  // Extract bar
-                // Create a unique key for this energy-layer-bar combination
-                TString comboKey = Form("SumHisto_%g_%s%s", energy, layer.Data(), bar.Data());
-
-                // Sum histograms for this combination across all runs
-                for (int runNumber : heData.runCombinations[energy]) {
-                    TString fileName = baseName + TString::Format("%d", runNumber) + suffix;
-                    SumHistograms(fileName, energy, runNumber, comboKey, heData);
-                }
-                // Perform the fit for this specific combination
-                fitChargeH[comboKey] = PerformFit(heData, comboKey);
-            }
-        }
-
-        // Plot the charge fit results
-        PlotChargeFitResults(fitChargeH, "H");
-    }
-
-    if (cData.flag) {
-
-        map<TString, pair<Double_t, Double_t>> fitChargeC;
-        // Loop over each energy
-        for (Double_t energy : heData.energies) {
-            // Loop over each layer-bar combination for the current energy
-            for (const auto& combination : heData.validCombinations[energy]) {
-                TString layer = combination.first; // Extract layer
-                TString bar = combination.second;  // Extract bar
-                // Create a unique key for this energy-layer-bar combination
-                TString comboKey = Form("SumHisto_%g_%s%s", energy, layer.Data(), bar.Data());
-
-                // Sum histograms for this combination across all runs
-                for (int runNumber : heData.runCombinations[energy]) {
-                    TString fileName = baseName + TString::Format("%d", runNumber) + suffix;
-                    SumHistograms(fileName, energy, runNumber, comboKey, heData);
-                }
-                // Perform the fit for this specific combination
-                fitChargeC[comboKey] = PerformFit(heData, comboKey);
-            }
-        }
-
-        // Plot the charge fit results
-        PlotChargeFitResults(fitChargeC, "C");
-    }
-
-    return;
 }
 
-void ProcessFile(const TString &fileName, const int runNumber, FitData &heData, FitData &hData, FitData &cData) {
-    TFile *file = TFile::Open(fileName, "READ");
-    if (!file || file->IsZombie()) {
-        cerr << "Error: Cannot open the file " << fileName << endl;
-        return;
-    }
-
-    TObjString *ionInfoObj = (TObjString *)file->Get("IonInfo");
-    TObjString *energyObj = (TObjString *)file->Get("BeamEnergyInfo");
-
-    if (!ionInfoObj || !energyObj) {
-        cerr << "Error: IonInfo or BeamEnergyInfo not found in " << fileName << endl;
-        file->Close();
-        delete file;
-        return;
-    }
-
-    TString ionType = ionInfoObj->GetString();
-    Double_t beamEnergy = energyObj->GetString().Atof();
-
-    FitData *data;
-    if (ionType == "HE") {
-        data = &heData;
-    } else if (ionType == "H") {
-        data = &hData;
-    } else if (ionType == "C") {
-        data = &cData;
-    } else {
-        cerr << "Warning: Unknown ion type " << ionType << " in " << fileName << endl;
-        file->Close();
-        delete file;
-        return;
-    }
-
-    (*data).flag=1;
-    (*data).energies.insert(beamEnergy);
-    (*data).runCombinations[beamEnergy].push_back(runNumber);
-
-    TIter nextKey(file->GetListOfKeys());
+// Function to sum all "nentries" values in a file
+int SumNentries(TFile* file) {
+    int totalNentries = 0;
+    TIter next(file->GetListOfKeys());
     TKey* key;
-    while ((key = (TKey*)nextKey())) {
-        TString keyName = key->GetName();
+    std::regex nentriesRegex("nentries_run_\\d+");
 
-        // Check if the key matches the pattern for FitResult
-        if (keyName.BeginsWith("FitResult_Charge_layer")) {
-            // Extract the layer-bar combination using string parsing
-            TString layer = keyName(keyName.Index("layer"), keyName.Index("_bar") - keyName.Index("layer") + 1);
-            TString bar = keyName(keyName.Index("bar"), keyName.Length() - keyName.Index("bar"));
-
-            // Store the combination (key ensures uniqueness)
-            (*data).validCombinations[beamEnergy].emplace_back(layer, bar);
+    while ((key = (TKey*)next())) {
+        TObject* obj = key->ReadObj();
+        TNamed* nentriesObj = dynamic_cast<TNamed*>(obj);
+        if (nentriesObj && std::regex_match(nentriesObj->GetName(), nentriesRegex)) {
+            totalNentries += std::stoi(nentriesObj->GetTitle());
         }
+        delete obj;
     }
-    file->Close();
-    delete file;
+    return totalNentries;
 }
 
-void SumHistograms(const TString &fileName, const Double_t energy, const int runNumber, const TString &comboKey, FitData &Data) {
-    TFile* file = TFile::Open(fileName, "READ");
+// Function to fit histograms in a directory and store results
+void FitHistogramsInDirectory(
+    TDirectory* dir, 
+    double threshold, 
+    double energy, 
+    std::map<TString, std::map<int, double>>& fitMeans, 
+    std::map<TString, std::map<int, double>>& fitErrors, 
+    TFile* outputFile
+) {
+    if (!dir) return;
+
+    TIter next(dir->GetListOfKeys());
+    TKey* key;
+
+    while ((key = (TKey*)next())) {
+        TObject* obj = key->ReadObj();
+        TH1* hist = dynamic_cast<TH1*>(obj);
+        if (!hist) {
+            delete obj;
+            continue;
+        }
+
+        TString histName = hist->GetName();
+        if (!histName.BeginsWith("Charge_Layer")) {
+            delete hist;
+            continue;
+        }
+
+        // Extract layer and bar identifiers
+        TString layerBarCombination = histName(7, histName.Length() - 7);  // e.g. LayerY_bar9
+
+        // Fit histogram if above the threshold
+        if (hist->GetEntries() > threshold) {
+            TF1* fitFunc = new TF1("fitFunc", "gaus");
+            TFitResultPtr fitResult = hist->Fit(fitFunc, "QS", " ", 2., 10.);
+
+            double meanCharge = fitFunc->GetParameter(1);
+            double stdCharge = fitFunc->GetParameter(2);
+            double meanChargeErr = fitFunc->GetParError(1);
+
+            if (!meanCharge || meanCharge < 0 || stdCharge / meanCharge > 0.2) continue;
+            fitMeans[layerBarCombination][energy] = meanCharge;
+            fitErrors[layerBarCombination][energy] = meanChargeErr;
+
+            // Save the histogram with fit to the output file
+            outputFile->cd();
+            hist->Write();
+            fitResult->Write(Form("FitResult_%s", layerBarCombination.Data()));  // Save the TFitResult
+            delete fitFunc;
+        }
+
+        delete hist;
+    }
+}
+
+// Function to process a single file and extract fit data
+void ProcessFile(
+    const std::string& fileName, 
+    double energy, 
+    std::map<TString, std::map<int, double>>& fitMeans, 
+    std::map<TString, std::map<int, double>>& fitErrors
+) {
+    TFile* file = TFile::Open(fileName.c_str(), "READ");
     if (!file || file->IsZombie()) {
-        cerr << "Error: Cannot open file " << fileName << endl;
+        std::cerr << "Error: Unable to open file " << fileName << std::endl;
         return;
     }
 
-    // Check if energy exists in validCombinations
-    if (Data.validCombinations.find(energy) == Data.validCombinations.end()) {
-        cerr << "Warning: No valid combinations for energy " << energy << endl;
-        file->Close();
-        delete file;
-        return;
-    }
+    int totalNentries = SumNentries(file);
+    double threshold = 0.009 * totalNentries;
 
-    for (const auto& combination : Data.validCombinations[energy]) {
-        TString layer = combination.first;
-        TString bar = combination.second;
-        TString DirName;
+    std::cout << "Processing file: " << fileName << ", Total nentries: " << totalNentries << ", Threshold: " << threshold << std::endl;
 
-        TString layer_root;
-        if (layer == "layer0_") {
-            layer_root = "LayerY_";
-            DirName = "ChargeTimeLayerY/";
-        } else if (layer == "layer1_") {
-            layer_root = "LayerX_";
-            DirName = "ChargeTimeLayerX/";
-        } else {
-            cerr << "Invalid layer name" << endl;
+    // Create an output ROOT file to store fitted histograms
+    TString outputFileName = TString(fileName).ReplaceAll(".root", "_Fit.root");
+    TFile* outputFile = TFile::Open(outputFileName, "RECREATE");
+
+    const std::vector<std::string> directories = {"ChargeTimeLayerX", "ChargeTimeLayerY"};
+    for (const auto& dirName : directories) {
+        TDirectory* dir = dynamic_cast<TDirectory*>(file->Get(dirName.c_str()));
+        if (!dir) {
+            std::cerr << "Error: Directory " << dirName << " not found in file " << fileName << std::endl;
             continue;
         }
-
-        TString histoName = Form("%sCharge_%s%s", DirName.Data(), layer_root.Data(), bar.Data());
-        TH1D* histo = (TH1D*)file->Get(histoName);
-        if (!histo) {
-            cerr << "Warning: Histogram " << histoName << " not found in " << fileName << endl;
-            continue;
-        }
-
-        // Check if the histogram for this layer-bar combination exists in SumHisto
-        if (!Data.SumHisto[comboKey]) {
-            // Create the histogram if it doesn't exist
-            Data.SumHisto[comboKey] = (TH1D*)histo->Clone(Form("SumHisto_%s", comboKey.Data()));
-            Data.SumHisto[comboKey]->SetDirectory(0); // Detach from file
-        } else {
-            // Add the histogram to the existing one for the same layer-bar combination
-            Data.SumHisto[comboKey]->Add(histo);
-        }
+        FitHistogramsInDirectory(dir, threshold, energy, fitMeans, fitErrors, outputFile);
     }
 
+    outputFile->Close();
     file->Close();
+    delete outputFile;
     delete file;
 }
 
-pair<Double_t, Double_t> PerformFit(FitData &Data, TString comboKey) {
-    // Check if the key exists in SumHisto
-    if (Data.SumHisto.find(comboKey) == Data.SumHisto.end()) {
-        cerr << "Error: No summed histogram found for key " << comboKey << endl;
-        return {-1.0, -1.0}; // Return default values
+// Function to create and save a graph for a given layer-bar combination
+void CreateAndSaveGraph(
+    const TString& layerBarCombination, 
+    const std::map<int, double>& energiesAndFits, 
+    const std::map<TString, std::map<int, double>>& fitErrors
+) {
+    TGraphErrors* graph = new TGraphErrors();
+    int pointIndex = 0;
+
+    for (const auto& [energy, fitMean] : energiesAndFits) {
+        double fitError = fitErrors.at(layerBarCombination).at(energy);
+        graph->SetPoint(pointIndex, energy, fitMean);
+        graph->SetPointError(pointIndex, 0, fitError);
+        ++pointIndex;
     }
 
-    // Retrieve the summed histogram
-    TH1D* histo = Data.SumHisto[comboKey];
-    if (!histo) {
-        cerr << "Error: Summed histogram for key " << comboKey << " is null" << endl;
-        return {-1.0, -1.0}; // Return default values
-    }
+    TCanvas* c = new TCanvas("c", "Fit Results", 800, 600);
+    graph->SetTitle(Form("Merged Fit Mean Charge vs Beam Energy for %s", layerBarCombination.Data()));
+    graph->GetXaxis()->SetTitle("Beam Energy [MeV]");
+    graph->GetYaxis()->SetTitle("Mean Charge [a.u.]");
+    c->SetLeftMargin(0.15);
+    graph->SetMarkerStyle(24);
+    graph->Draw("AP");
 
-    // Perform the Gaussian fit
-    TFitResultPtr fitResult = histo->Fit("gaus", "QS", " ", 2., 10.);
-    if (!fitResult->IsValid()) {
-        cerr << "Fit failed for key " << comboKey << endl;
-        return {-1.0, -1.0}; // Return default values
-    }
-
-    // Extract fit parameters
-    Double_t mean = fitResult->Parameter(1);
-    Double_t meanErr = fitResult->ParError(1);
-
-    // Store the fit results
-    Data.fitMean[comboKey] = mean;
-    Data.fitMeanErr[comboKey] = meanErr;
-
-    // Print fit results
-    cout << "Fit Results for Key " << comboKey << ":\n"
-         << "  Mean: " << mean << " ± " << meanErr << endl;
-
-    return {mean, meanErr};
+    c->SaveAs(Form("Plots/Merged_Fit_%s.png", layerBarCombination.Data()));
+    delete c;
+    delete graph;
 }
-
-void PlotChargeFitResults(const map<TString, pair<Double_t, Double_t>> &fitCharge, const TString &dataLabel) {
-    // Group data by layer-bar combinations
-    map<TString, vector<pair<Double_t, pair<Double_t, Double_t>>>> groupedData;
-
-    for (const auto& [key, fitResult] : fitCharge) {
-        // Extract energy, layer, and bar from the key
-        TString energyStr = key(9, key.Index("_", 9) - 9); // Extract energy from "SumHisto_energy_..."
-        TString layerBar = key(key.Index("_", 9) + 1, key.Length()); // Extract layer-bar (e.g., "layer0_bar10")
-
-        // Convert energy to Double_t
-        Double_t energy = atof(energyStr.Data());
-
-        // Group the data by layer-bar
-        groupedData[layerBar].emplace_back(energy, fitResult);
-    }
-
-    // Create a TGraphErrors for each layer-bar combination
-    for (const auto& [layerBar, data] : groupedData) {
-        TGraphErrors *graph = new TGraphErrors();
-        int pointIndex = 0;
-
-        // Add all energy-charge pairs to the graph
-        for (const auto& [energy, fitResult] : data) {
-            Double_t meanCharge = fitResult.first;
-            Double_t meanChargeErr = fitResult.second;
-
-            if (meanCharge != -1.0 && meanChargeErr != -1.0) {
-                graph->SetPoint(pointIndex, energy, meanCharge);
-                graph->SetPointError(pointIndex, 0, meanChargeErr); // No x-error
-                pointIndex++;
-            }
-        }
-
-        // Style the graph
-        graph->SetTitle(Form("Sum Fit Charge %s for %s;Beam Energy (MeV);Mean Charge [a.u.]", dataLabel.Data(), layerBar.Data()));
-        graph->SetMarkerStyle(20);
-        graph->SetMarkerColor(kBlue);
-        graph->SetLineColor(kBlue);
-
-        // Adjust axis labels
-        graph->GetYaxis()->SetTitle("Mean Charge [a.u.]");
-        graph->GetYaxis()->SetTitleOffset(1.8); // Adjust for better visibility
-        graph->GetXaxis()->SetTitle("Beam Energy (MeV)");
-
-        // Create a canvas for this combination and draw the graph
-        TCanvas *canvas = new TCanvas(Form("SumFitCharge_%s_%s", dataLabel.Data(), layerBar.Data()), Form("Sum Fit Charge %s for %s", dataLabel.Data(), layerBar.Data()), 800, 600);
-        canvas->SetLeftMargin(0.18); // Increase left margin to avoid cropping
-        canvas->SetBottomMargin(0.12); // Increase bottom margin for clarity
-
-        graph->Draw("AP");
-
-        // Save the plot with the correct name format
-        canvas->SaveAs(Form("Plots/SumFitCharge_%s_%s.png", dataLabel.Data(), layerBar.Data()));
-
-        // Clean up memory
-        delete graph;
-        delete canvas;
-    }
-}
-
-
-

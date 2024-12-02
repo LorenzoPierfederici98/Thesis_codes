@@ -135,24 +135,6 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
   }
 
   printf("Total Entries to be processed::%d\n\n", (int)nentries);
-
-  const char *insertStr = "_Fit";
-  const char *dotPos = strrchr(outfile, '.');
-
-  size_t prefixLength = dotPos - outfile; // Length of string before ".root"
-  size_t originalLength = strlen(outfile);
-  size_t insertLength = strlen(insertStr);
-  size_t newLength = originalLength + insertLength;
-  char *fitFilename = new char[newLength + 1];
-
-  strncpy(fitFilename, outfile, prefixLength);
-  // Append the insert string
-  strcpy(fitFilename + prefixLength, insertStr);
-  // Append the rest of the original string (from ".root" onward)
-  strcpy(fitFilename + prefixLength + insertLength, dotPos);
-
-  TFile *fitFile = new TFile(fitFilename, "RECREATE");
-  delete[] fitFilename;
   string beamEnergyStr;
 
   if (runNumber == 4723 || runNumber == 4725 || runNumber == 4726 || runNumber == 4628){
@@ -173,12 +155,12 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
 
   TObjString objString(beamEnergyStr.c_str());
   TObjString materialObj(parGeo->GetBeamPar().Material);
-  fout->cd();
-  objString.Write("BeamEnergyInfo");
-  fitFile->cd();                     // Ensure the correct file is active
-  objString.Write("BeamEnergyInfo"); // Write the primary beam energy and type of particle in the fit file
-  materialObj.Write("IonInfo");
+  TObjString nentriesObj(to_string(nentries).c_str());
 
+  fout->cd();
+  objString.Write(Form("BeamEnergyInfo run %d", runNumber));
+  materialObj.Write(Form("IonInfo run %d", runNumber));
+  nentriesObj.Write(Form("nentries run %d", runNumber));
   // Loop over the TTree
   gTAGroot.BeginEventLoop();
 
@@ -239,7 +221,7 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
         if (hitY->GetEnergyLoss() > 0)
         {
           Bar_ID_Y->Fill(barY);
-          PosY->Fill(posAlongX);
+          PosY->Fill(posAlongY);
         }
         // Only fill hTwMapPos if both hitX and hitY have EnergyLoss > 0
         if (hitX->GetEnergyLoss() > 0 && hitY->GetEnergyLoss() > 0)
@@ -274,12 +256,24 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
       TATWhit *hitX = twNtuHit->GetHit(0, (Int_t)LayerX);
       Double_t posAlongX = hitX->GetPosition(); // it provides the X coordinate
       Int_t barID_1hit_X = hitX->GetBar();
-      Double_t posBarY = twparGeo->GetBarPosition((Int_t)LayerX, hitX->GetBar())[1];
+      Double_t posBarY = twparGeo->GetBarPosition((Int_t)LayerX, barID_1hit_X)[1];
+      Double_t chargeAX = hitX->GetChargeChA();
+      Double_t chargeBX = hitX->GetChargeChB();
+      if (chargeAX < 0)
+        chargeAX = 0;
+      if (chargeBX < 0)
+        chargeBX = 0;
 
       TATWhit *hitY = twNtuHit->GetHit(0, (Int_t)LayerY);
       Double_t posAlongY = hitY->GetPosition(); // it provides the Y coordinate
       Int_t barID_1hit_Y = hitY->GetBar();
-      Double_t posBarX = twparGeo->GetBarPosition((Int_t)LayerY, hitY->GetBar())[0];
+      Double_t posBarX = twparGeo->GetBarPosition((Int_t)LayerY, barID_1hit_Y)[0];
+      Double_t chargeAY = hitY->GetChargeChA();
+      Double_t chargeBY = hitY->GetChargeChB();
+      if (chargeAY < 0)
+        chargeAY = 0;
+      if (chargeBY < 0)
+        chargeBY = 0;
 
       hResX_1Cross->Fill(posAlongX - posBarX);
       hResY_1Cross->Fill(posAlongY - posBarY);
@@ -296,7 +290,7 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
 
       TATWhit *hit = twNtuHit->GetHit(ihit);
 
-      if (!hit)
+      if (!hit || !hit->IsValid())
         continue;
 
       Int_t bar = hit->GetBar();
@@ -307,10 +301,6 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
       Int_t Z = hit->GetChargeZ();
       Double_t chargeA = hit->GetChargeChA();
       Double_t chargeB = hit->GetChargeChB();
-      if (chargeA < 0)
-        chargeA = 0;
-      if (chargeB < 0)
-        chargeB = 0;
       Double_t chargeBar = sqrt(chargeA * chargeB);
       Double_t timeA = hit->GetTimeChA();
       Double_t timeB = hit->GetTimeChB();
@@ -329,6 +319,7 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
           hToF_CentralBars->Fill(tof);
         }
         heloss_all->Fill(eloss);
+        Charge_vs_tof->Fill(tof, chargeBar);
         ChargeA_perBar[layer][bar]->Fill(chargeA);
         ChargeA_perBar[layer][bar]->SetDirectory(0);
         ChargeB_perBar[layer][bar]->Fill(chargeB);
@@ -386,49 +377,6 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
 
   gTAGroot.EndEventLoop();
 
-  const Double_t fractionThreshold = 0.009; // Fraction of total entries required (e.g., 0.1 for 10%)
-  Int_t fitThreshold = static_cast<Int_t>(fractionThreshold * nentries);
-
-  for (int ilay = 0; ilay < kLayers; ilay++)
-  {
-    for (int ibar = 0; ibar < 20; ibar++) // Loop through all bars from 0 to 19
-    {
-      // Get the number of entries in the histograms
-      int chargeEntries = Charge_perBar[ilay][ibar]->GetEntries();
-      int timeEntries = Time_perBar[ilay][ibar]->GetEntries();
-
-      // Check if Charge_perBar histogram has sufficient entries
-      if (chargeEntries >= fitThreshold)
-      {
-        TFitResultPtr c = Charge_perBar[ilay][ibar]->Fit("gaus", "QS", " ", 2., 10.);
-
-        if (c->IsValid())
-        {
-          fitFile->cd();
-          c->Write(Form("FitResult_Charge_layer%d_bar%d", ilay, ibar));
-        }
-        else
-        {
-          std::cerr << "Fit failed for Charge in layer " << ilay << ", bar " << ibar << std::endl;
-        }
-      }
-
-      // Check if Time_perBar histogram has sufficient entries
-      // if (timeEntries >= fitThreshold)
-      // {
-      //   TFitResultPtr t = Time_perBar[ilay][ibar]->Fit("gaus", "QS");
-
-      //   if (t->IsValid())
-      //   {
-      //     t->Write(Form("FitResult_Time_layer%d_bar%d", ilay, ibar));
-      //   }
-      //   else
-      //   {
-      //     std::cerr << "Fit failed for Time in layer " << ilay << ", bar " << ibar << std::endl;
-      //   }
-      // }
-    }
-  }
 
   // After the loop, switch to the correct directory and write the histograms
   DirChargeTimeLayerY->cd();
@@ -453,42 +401,6 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
     Time_perBar[1][bar]->Write();
   }
 
-  fitFile->cd();
-  TFitResultPtr t = hToF->Fit("gaus", "QS");
-
-  if (t->IsValid())
-  {
-    t->Write(Form("TW_Fit"));
-  }
-  else
-  {
-    std::cerr << "Fit TW failed" << std::endl;
-  }
-
-  TFitResultPtr t_c = hToF_CentralBars->Fit("gaus", "QS");
-
-  if (t_c->IsValid())
-  {
-    t_c->Write(Form("TW_Fit_CentralBars"));
-  }
-  else
-  {
-    std::cerr << "Fit TW Central Bars failed" << std::endl;
-  }
-
-  TFitResultPtr t_xy = hToF_Bar9->Fit("gaus", "QS");
-
-  if (t_xy->IsValid())
-  {
-    t_xy->Write(Form("TW_Fit_Bar9XY"));
-  }
-  else
-  {
-    std::cerr << "Fit TW Bar9 XY" << std::endl;
-  }
-
-  fitFile->Close();
-  delete fitFile;
   cout << endl
        << "Job Done!" << endl;
 
@@ -555,8 +467,8 @@ void BookHistograms()
     for (int ibar = 0; ibar < (int)nBarsPerLayer; ibar++)
     {
       // dE_vs_tof_perBar[ilay][ibar] = new TH2D(Form("dE_vs_tof_%s_bar%d",LayerName[(TLayer)ilay].data(),ibar),Form("dE_vs_tof_%s_bar%d",LayerName[(TLayer)ilay].data(),ibar),25000,5.,30.,1200,0.,120.);  // 1~ps/bin - 0.1 MeV/bin
-      ChargeA_perBar[ilay][ibar] = new TH1D(Form("Charge_ChA_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Charge_ChA_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 120, -2., 12.);
-      ChargeB_perBar[ilay][ibar] = new TH1D(Form("Charge_ChB_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Charge_ChB_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 120, -2., 12.);
+      ChargeA_perBar[ilay][ibar] = new TH1D(Form("Charge_ChA_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Charge_ChA_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 120, -2., 20.);
+      ChargeB_perBar[ilay][ibar] = new TH1D(Form("Charge_ChB_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Charge_ChB_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 120, -2., 20.);
       Charge_perBar[ilay][ibar] = new TH1D(Form("Charge_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Charge_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 120, -2., 20.);
       TimeA_perBar[ilay][ibar] = new TH1D(Form("Time_ChA_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Time_ChA_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 150, -100., 400.);
       TimeB_perBar[ilay][ibar] = new TH1D(Form("Time_ChB_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Time_ChB_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 150, -100., 400.);
@@ -572,6 +484,8 @@ void BookHistograms()
 
   hTwMapPos_TWpntBin = new TH2D("hTwMapPos_TWpntBin", "hTwMapPos_TWpntBin", 22, -22., 22., 22, -22., 22.); // 2 cm/bin - 2 cm/bin
   hTwMapPos_TWpnt = new TH2D("hTwMapPos_TWpnt", "hTwMapPos_TWpnt", 220, -22., 22., 220, -22., 22.);        // 2 mm/bin - 2 mm/bin
+
+  Charge_vs_tof = new TH2D("Charge_vs_tof", "Charge_vs_tof", 220, 6., 20., 220, -2., 20.);
 
   hTwMapPos = new TH2D("hTwMapPos", "hTwMapPos", 220, -22., 22., 220, -22., 22.); // 2 mm/bin - 2 mm/bin
   hTwMapPos_Bar9 = new TH2D("hTwMapPos_Bar9", "hTwMapPos_Bar9", 220, -22., 22., 220, -22., 22.);

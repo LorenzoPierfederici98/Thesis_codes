@@ -1,44 +1,21 @@
-//Macro that plots the charge given by the fit performed in AnalyzePeakCrystal.cc in all
-//the available crystals vs the beam energy. The fit results are stored in root files, named like
-//Fit_Calo_Crystal_1_Energy_200MeV.root. To be run with root -l 'CaloPeakEnergyDisplay.cc({180, 200, 220})'
-//{180, 200, 220} being the vector of energy values, it loops on every crystalID and extracts the fit
-//values only on the available IDs.
+// Macro that plots the charge given by the fit performed in AnalyzePeakCrystal.cc in all
+// the available crystals vs the beam energy. The fit results are stored in objects, named like
+// Fit_result_Charge_Calo_crystalId_1 inside the e.g. Calo/AnaFOOT_Calo_Decoded_HIT2022_140MeV_Fit.root file.
+// To be run with root -l 'CaloPeakEnergyDisplay.cc()' it loops on every crystalID and extracts the fit
+// values only on the available IDs.
 
-#include <TFile.h>
-#include <TF1.h>
-#include <TFitResult.h>
-#include <TCanvas.h>
-#include <TGraphErrors.h>
-#include <iostream>
-#include <sstream>
+#include "CaloPeakEnergyDisplay.h"
 
-std::string ConvertFileNumbersToString(const std::vector<int>& energies) {
-    std::stringstream ss;
-    for (size_t i = 0; i < energies.size(); ++i) {
-        ss << energies[i];
-        if (i != energies.size() - 1) {
-            ss << ", ";  // Add a comma and space between numbers
-        }
-    }
-    return ss.str();
-}
+void CaloPeakEnergyDisplay() {
 
-pair<double, double> RoundMeasurement(double value, double uncertainty){
-    //Get the order of magnitude of the uncertainty
-    int significantFigures = (int)std::ceil(-std::log10(uncertainty)) + 1;
+    std::vector<std::pair<std::string, double>> filesAndEnergies = {
+        {"Calo/AnaFOOT_Calo_Decoded_HIT2022_140MeV_Fit.root", 140},
+        {"Calo/AnaFOOT_Calo_Decoded_HIT2022_180MeV_Fit.root", 180},
+        {"Calo/AnaFOOT_Calo_Decoded_HIT2022_200MeV_Fit.root", 200},
+        {"Calo/AnaFOOT_Calo_Decoded_HIT2022_220MeV_Fit.root", 220}
+    };
 
-    //Calculate the rounding factor based on significant figures
-    double roundingFactor = std::pow(10, significantFigures);
-
-    //Round the uncertainty and value accordingly
-    double roundedUncertainty = std::round(uncertainty * roundingFactor) / roundingFactor;
-    double roundedValue = std::round(value * roundingFactor) / roundingFactor;
-
-    return {roundedValue, roundedUncertainty};
-}
-
-void CaloPeakEnergyDisplay(const std::vector<int> &energies) {
-    std::string energiesStr = ConvertFileNumbersToString(energies);
+    std::vector<int> energies = {140, 180, 200, 220};
 
     for (int crystalID = 0; crystalID < 63; crystalID++) {
         TCanvas *canvas = new TCanvas("canvas", "Calo Fit Results vs Energies", 800, 600);
@@ -46,19 +23,18 @@ void CaloPeakEnergyDisplay(const std::vector<int> &energies) {
         TGraphErrors *graph = new TGraphErrors();
         int pointIndex = 0;
 
-        for (int energy : energies) {
-            TString filename = Form("FitCalo/Fit_Calo_Crystal_%d_Energy_%dMeV.root", crystalID, energy);
-            TFile *inFile = TFile::Open(filename);
+        for (const auto &[fileName, energy] : filesAndEnergies) {
+            TFile *inFile = TFile::Open(fileName.c_str());
 
             if (!inFile || inFile->IsZombie()) {
-                std::cerr << "Error: Could not open file " << filename << std::endl;
+                std::cerr << "Error: Could not open file " << fileName << std::endl;
                 if (inFile) inFile->Close(); // Ensure file is closed if it exists
                 continue;
             }
 
-            TFitResult *fitresult = (TFitResult *)inFile->Get("Fit_Results");
+            TFitResult *fitresult = (TFitResult *)inFile->Get(Form("Fit_result_Charge_Calo_crystalId_%d", crystalID));
             if (!fitresult) {
-                std::cerr << "Warning: Fit results not found in file " << filename << std::endl;
+                std::cerr << "Warning: Fit results not found in file " << fileName << std::endl;
                 inFile->Close();
                 continue;
             }
@@ -86,6 +62,7 @@ void CaloPeakEnergyDisplay(const std::vector<int> &energies) {
             continue;
         }
 
+        string energiesStr = ConvertFileNumbersToString(energies);
         // Customize the graph
         graph->SetTitle(Form("Beam Energies HE: %s MeV | Crystal ID: %d", energiesStr.c_str(), crystalID));
         graph->SetMarkerStyle(24);
@@ -126,7 +103,7 @@ void CaloPeakEnergyDisplay(const std::vector<int> &energies) {
             fitInfo->Draw("same");
             canvas->Modified();
             canvas->Update();
-            canvas->SaveAs(Form("Plots/Calo_FitCharge_Energy_Crystal_%d.png", crystalID));
+            canvas->SaveAs(Form("Plots/Merged_Calo_FitCharge_Energy_Crystal_%d.png", crystalID));
 
             delete fitInfo;
         }
@@ -135,5 +112,30 @@ void CaloPeakEnergyDisplay(const std::vector<int> &energies) {
         delete graph;
         delete canvas;
     }
+}
+
+std::string ConvertFileNumbersToString(const std::vector<int>& energies) {
+    std::stringstream ss;
+    for (size_t i = 0; i < energies.size(); ++i) {
+        ss << energies[i];
+        if (i != energies.size() - 1) {
+            ss << ", ";  // Add a comma and space between numbers
+        }
+    }
+    return ss.str();
+}
+
+pair<double, double> RoundMeasurement(double value, double uncertainty){
+    //Get the order of magnitude of the uncertainty
+    int significantFigures = (int)std::ceil(-std::log10(uncertainty)) + 1;
+
+    //Calculate the rounding factor based on significant figures
+    double roundingFactor = std::pow(10, significantFigures);
+
+    //Round the uncertainty and value accordingly
+    double roundedUncertainty = std::round(uncertainty * roundingFactor) / roundingFactor;
+    double roundedValue = std::round(value * roundingFactor) / roundingFactor;
+
+    return {roundedValue, roundedUncertainty};
 }
 

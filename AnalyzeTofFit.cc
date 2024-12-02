@@ -1,143 +1,152 @@
-//Macro to analyze the fit results on ToF on the entire TW and on the central bars (8, 9, 10),
-//performed by the AnalyzeTWChargeTime.cc macro. A mean ToF value and a mean sigma value from the
-//gaussian fit are performed if there are multiple values for a given energy. The mean ToF values and
-//sigmas are plotted against the beam energy, both for the entire TW and for the central bars only.
-//To be run with e.g. root -l 'AnalyzeTofFit.cc({4742, 4743, 4828})'
+// Macro thath fits the ToF-raw distribution from the AnalyzeTWChargeTime.cc merged output files.
+// The ToF distribution from the entire ToF-Wall, from the central bars (8, 9, 10) and from bars 9
+// of the two layers are fitted, then the mean ToF and ToF standard deviation are plotted vs the
+// beam energy.
 
+#include "AnalyzeTofFit.h"
 
-#include <vector>
-#include <TString.h>
-#include <TFile.h>
-#include <TFitResult.h>
-#include <TObjString.h>
-#include <TGraphErrors.h>
-#include <TCanvas.h>
-#include <iostream>
-#include <map>
-#include <cmath>
+void AnalyzeTofFit() {
 
-using namespace std;
+    std::vector<std::pair<std::string, double>> filesAndEnergies = {
+        {"TW/AnaFOOT_TW_Decoded_HIT2022_140MeV.root", 140},
+        {"TW/AnaFOOT_TW_Decoded_HIT2022_180MeV.root", 180},
+        {"TW/AnaFOOT_TW_Decoded_HIT2022_200MeV.root", 200},
+        {"TW/AnaFOOT_TW_Decoded_HIT2022_220MeV.root", 220}
+    };
 
-// Function to compute the mean and error
-pair<double, double> ComputeMeanAndError(const vector<double> &values, const vector<double> &errors) {
-    double sum = 0.0, squaredErrorSum = 0.0;
-    for (size_t i = 0; i < values.size(); ++i) {
-        sum += values[i];
-        squaredErrorSum += errors[i] * errors[i];
+    std::map<TString, std::vector<std::pair<double, FitResult>>> results;
+
+    for (const auto& [fileName, energy] : filesAndEnergies) {
+        ProcessAndPlot(fileName, energy, results);
     }
-    return {sum / values.size(), sqrt(squaredErrorSum)};
+
+    PlotResults(results);
 }
 
-// Modified PlotGraph function to include a third graph (Bar9XY)
-void PlotGraph(TGraphErrors* graph1, TGraphErrors* graph2, TGraphErrors* graph3, TString canvasTitle, TString graphTitle, TString yAxisTitle, TString legend2, TString legend3, double ylim) {
-    TCanvas* c1 = new TCanvas("c1", canvasTitle, 800, 600);
-    graph1->SetMarkerStyle(24); graph1->SetMarkerColor(kBlue);
-    graph1->SetTitle(graphTitle); 
-    graph1->GetXaxis()->SetTitle("Beam Energy [MeV]");
-    graph1->GetYaxis()->SetTitle(yAxisTitle + " [ns]"); 
-    graph1->GetYaxis()->SetRangeUser(0, ylim);
-    graph1->Draw("AP");
+FitResult SaveFitAndExtractParams(TFile* file, TH1* hist, TF1* fitFunc) {
+    file->cd();  // Ensure we are writing to the correct file directory
+    TString histName = TString(hist->GetName());
+    TString fitName = histName + "_fit";
+    hist->Write(fitName, TObject::kOverwrite);
 
-    graph2->SetMarkerStyle(24); graph2->SetMarkerColor(kRed);
-    graph2->Draw("P same");
-
-    graph3->SetMarkerStyle(24); graph3->SetMarkerColor(kGreen);  // New color for the third graph
-    graph3->Draw("P same");
-
-    // Updated legend with entries for all three graphs
-    TLegend* legend = new TLegend(0.7, 0.3, 0.9, 0.5);
-    legend->AddEntry(graph1, yAxisTitle, "P");
-    legend->AddEntry(graph2, legend2, "P");
-    legend->AddEntry(graph3, legend3, "P");  // Entry for the new graph
-    legend->Draw();
-
-    c1->SaveAs("Plots/" + canvasTitle + ".png");
-    delete c1;
+    FitResult result;
+    result.mean = fitFunc->GetParameter(1);  // Mean
+    result.meanError = fitFunc->GetParError(1);
+    result.sigma = fitFunc->GetParameter(2);  // Sigma
+    result.sigmaError = fitFunc->GetParError(2);
+    return result;
 }
 
+void ProcessAndPlot(const std::string& fileName, double energy,
+                    std::map<TString, std::vector<std::pair<double, FitResult>>>& results) {
+    TFile* inputFile = TFile::Open(fileName.c_str(), "READ");
+    TString outputFileName = fileName;
+    outputFileName.ReplaceAll(".root", "_Fit.root");
+    TFile* outputFile = TFile::Open(outputFileName, "UPDATE");
 
-// Function to analyze TOF fit results
-void AnalyzeTofFit(const vector<int> &fileNumbers) {
-    TString baseName = "TW/AnaFOOT_TW_Decoded_HIT2022_";
-    TString suffix = "_Fit.root";
-    TString fitresult_tof = "TW_Fit";
-    TString fitresult_tof_centralbars = "TW_Fit_CentralBars";
-    TString fitresult_tof_xy = "TW_Fit_Bar9XY"; // New variable for the fit result of bar 9
+    if (!inputFile || inputFile->IsZombie()) {
+        std::cerr << "Error opening file: " << fileName << std::endl;
+        return;
+    }
 
-    map<int, vector<double>> meanTofMap, meanTofCentralBarsMap, meanTofXYMap, sigmaTofMap, sigmaTofCentralBarsMap, sigmaTofXYMap;
-    map<int, vector<double>> meanTofErrorMap, meanTofCentralBarsErrorMap, meanTofXYErrorMap, sigmaTofErrorMap, sigmaTofCentralBarsErrorMap, sigmaTofXYErrorMap;
-    vector<double> beamEnergies;
+    TString histoNames[] = {"ToF_TW", "ToF_TW_CentralBars", "ToF_Bar9_XY"};
+    for (const auto& histo : histoNames) {
+        TH1* hist = dynamic_cast<TH1*>(inputFile->Get(histo));
+        if (hist) {
+            TF1* fitFunc = new TF1("fitFunc", "gaus");  // Adjust fit range as needed
+            hist->Fit(fitFunc, "Q");
 
-    for (int number : fileNumbers) {
-        TString fileName = baseName + TString::Format("%d", number) + suffix;
-        TFile *inFile = TFile::Open(fileName, "READ");
-        if (!inFile || inFile->IsZombie()) continue;
-
-        TObjString *energyObj = (TObjString *)inFile->Get("BeamEnergyInfo");
-        TFitResult *fitresult = (TFitResult *)inFile->Get(fitresult_tof);
-        TFitResult *fitresult_centralbars = (TFitResult *)inFile->Get(fitresult_tof_centralbars);
-        TFitResult *fitresult_xy = (TFitResult *)inFile->Get(fitresult_tof_xy); // Access the new fit result for bar 9
-
-        if (!energyObj || !fitresult || !fitresult_centralbars || !fitresult_xy) {
-            inFile->Close(); delete inFile; continue;
+            if (fitFunc) {
+                FitResult res = SaveFitAndExtractParams(outputFile, hist, fitFunc);
+                results[histo].emplace_back(energy, res);
+                
+                // Debug: Print fit results
+                std::cout << "Fit Results for " << histo << " at Energy: " << energy << std::endl;
+                std::cout << "Mean: " << res.mean << " +/- " << res.meanError << std::endl;
+                std::cout << "Sigma: " << res.sigma << " +/- " << res.sigmaError << std::endl;
+            }
+            delete fitFunc;
+        } else {
+            std::cerr << "Histogram " << histo << " not found in file: " << fileName << std::endl;
         }
-
-        int beamEnergy = energyObj->GetString().Atof();
-        if (find(beamEnergies.begin(), beamEnergies.end(), beamEnergy) == beamEnergies.end()) beamEnergies.push_back(beamEnergy);
-
-        meanTofMap[beamEnergy].push_back(fitresult->Parameter(1));
-        meanTofErrorMap[beamEnergy].push_back(fitresult->ParError(1));
-        meanTofCentralBarsMap[beamEnergy].push_back(fitresult_centralbars->Parameter(1));
-        meanTofCentralBarsErrorMap[beamEnergy].push_back(fitresult_centralbars->ParError(1));
-        meanTofXYMap[beamEnergy].push_back(fitresult_xy->Parameter(1));  // Add results for bar 9 XY
-        meanTofXYErrorMap[beamEnergy].push_back(fitresult_xy->ParError(1));
-
-        sigmaTofMap[beamEnergy].push_back(fitresult->Parameter(2));
-        sigmaTofErrorMap[beamEnergy].push_back(fitresult->ParError(2));
-        sigmaTofCentralBarsMap[beamEnergy].push_back(fitresult_centralbars->Parameter(2));
-        sigmaTofCentralBarsErrorMap[beamEnergy].push_back(fitresult_centralbars->ParError(2));
-        sigmaTofXYMap[beamEnergy].push_back(fitresult_xy->Parameter(2));  // Add results for bar 9 XY
-        sigmaTofXYErrorMap[beamEnergy].push_back(fitresult_xy->ParError(2));
-
-        inFile->Close();
-        delete inFile;
     }
-
-    TGraphErrors* graphMeanTof = new TGraphErrors();
-    TGraphErrors* graphMeanTofCentralbars = new TGraphErrors();
-    TGraphErrors* graphMeanTofXY = new TGraphErrors(); // New graph for bar 9 XY
-
-    TGraphErrors* graphSigmaTof = new TGraphErrors();
-    TGraphErrors* graphSigmaTofCentralbars = new TGraphErrors();
-    TGraphErrors* graphSigmaTofXY = new TGraphErrors(); // New graph for bar 9 XY
-
-    int pointIndex = 0;
-    for (double energy : beamEnergies) {
-        auto meanTof = ComputeMeanAndError(meanTofMap[energy], meanTofErrorMap[energy]);
-        auto meanTofCentralBars = ComputeMeanAndError(meanTofCentralBarsMap[energy], meanTofCentralBarsErrorMap[energy]);
-        auto meanTofXY = ComputeMeanAndError(meanTofXYMap[energy], meanTofXYErrorMap[energy]); // Calculate for bar 9 XY
-
-        auto sigmaTof = ComputeMeanAndError(sigmaTofMap[energy], sigmaTofErrorMap[energy]);
-        auto sigmaTofCentralBars = ComputeMeanAndError(sigmaTofCentralBarsMap[energy], sigmaTofCentralBarsErrorMap[energy]);
-        auto sigmaTofXY = ComputeMeanAndError(sigmaTofXYMap[energy], sigmaTofXYErrorMap[energy]); // Calculate for bar 9 XY
-
-        graphMeanTof->SetPoint(pointIndex, energy, meanTof.first);
-        graphMeanTof->SetPointError(pointIndex, 0, meanTof.second);
-        graphMeanTofCentralbars->SetPoint(pointIndex, energy, meanTofCentralBars.first);
-        graphMeanTofCentralbars->SetPointError(pointIndex, 0, meanTofCentralBars.second);
-        graphMeanTofXY->SetPoint(pointIndex, energy, meanTofXY.first); // Add point for bar 9 XY
-        graphMeanTofXY->SetPointError(pointIndex, 0, meanTofXY.second);
-
-        graphSigmaTof->SetPoint(pointIndex, energy, sigmaTof.first);
-        graphSigmaTof->SetPointError(pointIndex, 0, sigmaTof.second);
-        graphSigmaTofCentralbars->SetPoint(pointIndex, energy, sigmaTofCentralBars.first);
-        graphSigmaTofCentralbars->SetPointError(pointIndex, 0, sigmaTofCentralBars.second);
-        graphSigmaTofXY->SetPoint(pointIndex, energy, sigmaTofXY.first); // Add point for bar 9 XY
-        graphSigmaTofXY->SetPointError(pointIndex, 0, sigmaTofXY.second);
-
-        pointIndex++;
-    }
-
-    PlotGraph(graphMeanTof, graphMeanTofCentralbars, graphMeanTofXY, "Mean_ToF", "Mean ToF vs Beam Energy", "Mean ToF", "Mean ToF Central Bars (8, 9, 10)", "Mean ToF Bar 9(X), Bar 9(Y)", 12.);
-    PlotGraph(graphSigmaTof, graphSigmaTofCentralbars, graphSigmaTofXY, "Sigma_ToF", "#sigma ToF vs Beam Energy", "#sigma ToF", "#sigma ToF Central Bars (8, 9, 10)", "#sigma ToF Bar 9(X), Bar 9(Y)", 0.2);
+    inputFile->Close();
+    outputFile->Close();
 }
+
+
+void PlotResults(const std::map<TString, std::vector<std::pair<double, FitResult>>>& results) {
+    TCanvas* canvas = new TCanvas("c", "Fit Results", 800, 600);
+    TGraphErrors* meanGraph[3];
+    TGraphErrors* sigmaGraph[3];
+
+    int colors[] = {kRed, kBlue, kGreen};  // Different colors for different fit types
+    TString fitTypes[] = {"ToF_TW", "ToF_TW_CentralBars", "ToF_Bar9_XY"};
+
+    for (int i = 0; i < 3; ++i) {
+        meanGraph[i] = new TGraphErrors();
+        sigmaGraph[i] = new TGraphErrors();
+        meanGraph[i]->SetMarkerColor(colors[i]);
+        sigmaGraph[i]->SetMarkerColor(colors[i]);
+        meanGraph[i]->SetMarkerStyle(20 + i);
+        sigmaGraph[i]->SetMarkerStyle(20 + i);
+
+        int pointIndex = 0;
+        auto it = results.find(fitTypes[i]);
+        if (it != results.end()) {
+            for (const auto& [energy, fitResult] : it->second) {
+                meanGraph[i]->SetPoint(pointIndex, energy, fitResult.mean);
+                meanGraph[i]->SetPointError(pointIndex, 0, fitResult.meanError);
+
+                sigmaGraph[i]->SetPoint(pointIndex, energy, fitResult.sigma);
+                sigmaGraph[i]->SetPointError(pointIndex, 0, fitResult.sigmaError);
+                pointIndex++;
+            }
+        } else {
+            std::cerr << "Warning: No results found for " << fitTypes[i] << std::endl;
+        }
+    }
+
+    canvas->cd();
+    meanGraph[0]->SetTitle("Mean ToF vs Beam Energy");
+    meanGraph[0]->GetXaxis()->SetTitle("Beam Energy [MeV]");
+    meanGraph[0]->GetYaxis()->SetTitle("Mean ToF [ns]");
+    meanGraph[0]->SetMinimum(0.);
+    double xmean_max = meanGraph[0]->GetXaxis()->GetXmax();
+    meanGraph[0]->GetXaxis()->SetLimits(0., xmean_max);
+    meanGraph[0]->GetYaxis()->SetRangeUser(0, 12.);
+    meanGraph[0]->Draw("AP");
+    meanGraph[1]->Draw("P SAME");
+    meanGraph[2]->Draw("P SAME");
+
+    TLegend* legend_mean = new TLegend(0.7, 0.3, 0.9, 0.5);
+    legend_mean->AddEntry(meanGraph[0], "Mean ToF", "P");
+    legend_mean->AddEntry(meanGraph[1], "Mean ToF Central Bars (8, 9, 10)", "P");
+    legend_mean->AddEntry(meanGraph[2], "Mean ToF Bar 9(X), Bar 9(Y)", "P");  // Entry for the new graph
+    legend_mean->Draw();
+    canvas->SaveAs("Plots/Merged_Mean_ToF_Fit.png");
+    delete legend_mean;
+
+    canvas->Clear();
+    sigmaGraph[0]->SetTitle("#sigma ToF vs Beam Energy");
+    sigmaGraph[0]->GetXaxis()->SetTitle("Beam Energy [MeV]");
+    sigmaGraph[0]->GetYaxis()->SetTitle("#sigma ToF [ns]");
+    sigmaGraph[0]->SetMinimum(0.);
+    double xsigma_max = sigmaGraph[0]->GetXaxis()->GetXmax();
+    sigmaGraph[0]->GetXaxis()->SetLimits(0., xsigma_max);
+    sigmaGraph[0]->GetYaxis()->SetRangeUser(0, 0.2);
+    sigmaGraph[0]->Draw("AP");
+    sigmaGraph[1]->Draw("P SAME");
+    sigmaGraph[2]->Draw("P SAME");
+
+    TLegend* legend_sigma = new TLegend(0.7, 0.3, 0.9, 0.5);
+    legend_sigma->AddEntry(sigmaGraph[0], "#sigma ToF", "P");
+    legend_sigma->AddEntry(sigmaGraph[1], "#sigma ToF Central Bars (8, 9, 10)", "P");
+    legend_sigma->AddEntry(sigmaGraph[2], "#sigma ToF Bar 9(X), Bar 9(Y)", "P");  // Entry for the new graph
+    legend_sigma->Draw();
+    canvas->SaveAs("Plots/Merged_Sigma_ToF_Fit.png");
+
+    delete legend_sigma;
+    delete canvas;
+}
+
