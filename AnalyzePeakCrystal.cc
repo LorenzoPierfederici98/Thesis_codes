@@ -1,13 +1,13 @@
 // Macro that fits the 1D charge histograms for a given crystal of the calorimeter.
 // The histograms are retireved form the AnaLyzeCalo.cc merged output files (the histograms are automatically summed).
-// To be run with e.g.  root -l -b -q 'AnalyzePeakCrystal.cc()', -b doesn't display plots. In an interval between x_min and x_max a peak
-// is automatically found with TSpectrum and fitted. The fit results are inserted in files namekd like 
-// e.g. Calo/AnaFOOT_Calo_Decoded_HIT2022_140MeV_Fit.root which also store the crystalID charge histogram and the
-// fit plot restricted in [x_min, x_max].
+// To be run with e.g.  root -l -b -q 'AnalyzePeakCrystal.cc(x_min, x_max, fit_thresh)', -b doesn't display plots. 
+// In an interval between x_min and x_max a peak beyond fit_thresh is automatically found with TSpectrum and fitted.
+// The fit results are inserted in files namekd like e.g. Calo/AnaFOOT_Calo_Decoded_HIT2022_140MeV_Fit.root which also
+// store the crystalID charge histogram and the fit plot restricted in [x_min, x_max].
 
 #include "AnalyzePeakCrystal.h"
 
-void AnalyzePeakCrystal(const double x_min, const double x_max) {
+void AnalyzePeakCrystal(const double x_min, const double x_max, const double fit_thresh) {
     std::vector<std::pair<std::string, double>> filesAndEnergies = {
         {"Calo/AnaFOOT_Calo_Decoded_HIT2022_100MeV.root", 100},
         {"Calo/AnaFOOT_Calo_Decoded_HIT2022_140MeV.root", 140},
@@ -48,7 +48,7 @@ void AnalyzePeakCrystal(const double x_min, const double x_max) {
                     (crystal_ID == 4) ? 0.4 : x_max
                 );
 
-                TFitResultPtr fitResult = FitPeakWithTSpectrum(Charge_Calo_crystal, 0.25);
+                TFitResultPtr fitResult = FitPeakWithTSpectrum(Charge_Calo_crystal, fit_thresh);
                 if (fitResult.Get() != nullptr) {
                     std::cout << "Beam energy: " << energy << " MeV " << " crystal: " << crystal_ID << " ";
                     double meanCharge = fitResult->Parameter(1);
