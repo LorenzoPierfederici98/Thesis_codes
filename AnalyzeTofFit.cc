@@ -8,6 +8,7 @@
 void AnalyzeTofFit() {
 
     std::vector<std::pair<std::string, double>> filesAndEnergies = {
+        {"TW/AnaFOOT_TW_Decoded_HIT2022_100MeV.root", 100},
         {"TW/AnaFOOT_TW_Decoded_HIT2022_140MeV.root", 140},
         {"TW/AnaFOOT_TW_Decoded_HIT2022_180MeV.root", 180},
         {"TW/AnaFOOT_TW_Decoded_HIT2022_200MeV.root", 200},

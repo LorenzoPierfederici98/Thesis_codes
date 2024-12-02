@@ -9,13 +9,14 @@
 void CaloPeakEnergyDisplay() {
 
     std::vector<std::pair<std::string, double>> filesAndEnergies = {
+        {"Calo/AnaFOOT_Calo_Decoded_HIT2022_100MeV_Fit.root", 100},
         {"Calo/AnaFOOT_Calo_Decoded_HIT2022_140MeV_Fit.root", 140},
         {"Calo/AnaFOOT_Calo_Decoded_HIT2022_180MeV_Fit.root", 180},
         {"Calo/AnaFOOT_Calo_Decoded_HIT2022_200MeV_Fit.root", 200},
         {"Calo/AnaFOOT_Calo_Decoded_HIT2022_220MeV_Fit.root", 220}
     };
 
-    std::vector<int> energies = {140, 180, 200, 220};
+    std::vector<int> energies = {100, 140, 180, 200, 220};
 
     for (int crystalID = 0; crystalID < 63; crystalID++) {
         TCanvas *canvas = new TCanvas("canvas", "Calo Fit Results vs Energies", 800, 600);

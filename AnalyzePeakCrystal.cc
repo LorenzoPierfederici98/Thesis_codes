@@ -7,16 +7,17 @@
 
 #include "AnalyzePeakCrystal.h"
 
-void AnalyzePeakCrystal() {
+void AnalyzePeakCrystal(const double x_min, const double x_max) {
     std::vector<std::pair<std::string, double>> filesAndEnergies = {
+        {"Calo/AnaFOOT_Calo_Decoded_HIT2022_100MeV.root", 100},
         {"Calo/AnaFOOT_Calo_Decoded_HIT2022_140MeV.root", 140},
         {"Calo/AnaFOOT_Calo_Decoded_HIT2022_180MeV.root", 180},
         {"Calo/AnaFOOT_Calo_Decoded_HIT2022_200MeV.root", 200},
         {"Calo/AnaFOOT_Calo_Decoded_HIT2022_220MeV.root", 220}
     };
 
-    const double x_min = 0.2;
-    const double x_max = 0.6;
+    //const double x_min = 0.2;
+    //const double x_max = 0.6;
 
     for (const auto &[fileName, energy] : filesAndEnergies) {
         TFile *inFile = TFile::Open(fileName.c_str());

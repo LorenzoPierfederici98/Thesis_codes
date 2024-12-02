@@ -9,6 +9,7 @@ void DisplayCaloModules() {
     gStyle->SetOptStat(0);  // Display histogram stats (name and entries)
 
     std::vector<std::pair<std::string, double>> filesAndEnergies = {
+        {"Calo/AnaFOOT_Calo_Decoded_HIT2022_100MeV.root", 100},
         {"Calo/AnaFOOT_Calo_Decoded_HIT2022_140MeV.root", 140},
         {"Calo/AnaFOOT_Calo_Decoded_HIT2022_180MeV.root", 180},
         {"Calo/AnaFOOT_Calo_Decoded_HIT2022_200MeV.root", 200},
