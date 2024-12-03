@@ -71,10 +71,10 @@ void DisplayCaloModules() {
         title->SetNDC();  // Use normalized device coordinates (from 0 to 1)
         title->SetTextAlign(22);  // Center-align the title
         title->SetTextSize(0.03);  // Adjust text size
-        title->DrawLatex(0.5, 0.93, Form("Combined 2D Histograms: x, y Hits and Crystal IDs Beam Energy: %.0f MeV", beamEnergy));
+        title->DrawLatex(0.5, 0.93, Form("Merged 2D Histograms: x, y Hits and Crystal IDs Beam Energy: %.0f MeV", beamEnergy));
         c1->Modified();
         c1->Update();
-        c1->SaveAs(Form("Plots/Merged_CombinedCaloModules_Energy_%.0f.png", beamEnergy));
+        c1->SaveAs(Form("Plots/Merged_CaloModules_Energy_%.0f.png", beamEnergy));
 
         inFile->Close();
         delete inFile;
