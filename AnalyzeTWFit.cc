@@ -81,13 +81,16 @@ void FitHistogramsInDirectory(
         // Fit histogram if above the threshold
         if (hist->GetEntries() > threshold) {
             TF1* fitFunc = new TF1("fitFunc", "gaus");
-            TFitResultPtr fitResult = hist->Fit(fitFunc, "QS", " ", 2., 10.);
+            TFitResultPtr fitResult = hist->Fit(fitFunc, "QS", " ", 2., 13.);
 
             double meanCharge = fitFunc->GetParameter(1);
             double stdCharge = fitFunc->GetParameter(2);
             double meanChargeErr = fitFunc->GetParError(1);
 
-            if (!meanCharge || meanCharge < 0 || stdCharge / meanCharge > 0.2) continue;
+            if (!meanCharge || meanCharge < 0 || stdCharge / meanCharge > 0.2 || meanCharge / meanChargeErr - 1 < 0.5) {
+                std::cout << layerBarCombination << " Energy: " << energy << " MeV: Skipping fit (negative charge or std/charge > 0.2 or charge error too big)" << std::endl;
+                continue;
+            }
             fitMeans[layerBarCombination][energy] = meanCharge;
             fitErrors[layerBarCombination][energy] = meanChargeErr;
 
@@ -147,6 +150,7 @@ void CreateAndSaveGraph(
     const std::map<TString, std::map<int, double>>& fitErrors
 ) {
     TGraphErrors* graph = new TGraphErrors();
+    graph->SetMinimum(0.0);
     int pointIndex = 0;
 
     for (const auto& [energy, fitMean] : energiesAndFits) {
@@ -155,6 +159,9 @@ void CreateAndSaveGraph(
         graph->SetPointError(pointIndex, 0, fitError);
         ++pointIndex;
     }
+
+    double x_max = graph->GetXaxis()->GetXmax();
+    graph->GetXaxis()->SetLimits(0., x_max);
 
     TCanvas* c = new TCanvas("c", "Fit Results", 800, 600);
     graph->SetTitle(Form("Merged Fit Mean Charge vs Beam Energy for %s", layerBarCombination.Data()));

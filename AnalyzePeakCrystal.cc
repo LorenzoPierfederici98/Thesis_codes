@@ -7,7 +7,7 @@
 
 #include "AnalyzePeakCrystal.h"
 
-void AnalyzePeakCrystal(const double x_min, const double x_max, const double fit_thresh) {
+void AnalyzePeakCrystal() {
     std::vector<std::pair<std::string, double>> filesAndEnergies = {
         {"Calo/AnaFOOT_Calo_Decoded_HIT2022_100MeV.root", 100},
         {"Calo/AnaFOOT_Calo_Decoded_HIT2022_140MeV.root", 140},
@@ -16,8 +16,8 @@ void AnalyzePeakCrystal(const double x_min, const double x_max, const double fit
         {"Calo/AnaFOOT_Calo_Decoded_HIT2022_220MeV.root", 220}
     };
 
-    //const double x_min = 0.2;
-    //const double x_max = 0.6;
+    const double x_min = 0.2;
+    const double x_max = 0.6;
 
     for (const auto &[fileName, energy] : filesAndEnergies) {
         TFile *inFile = TFile::Open(fileName.c_str());
@@ -44,9 +44,11 @@ void AnalyzePeakCrystal(const double x_min, const double x_max, const double fit
 
                 TH1D *Charge_Calo_fullrange = static_cast<TH1D *>(Charge_Calo_crystal->Clone());
                 Charge_Calo_crystal->GetXaxis()->SetRangeUser(
-                    (crystal_ID == 4) ? 0.2 : x_min,
-                    (crystal_ID == 4) ? 0.4 : x_max
+                    (energy == 100) ? 0.1 : x_min,
+                    (energy == 100) ? 0.35 : x_max
                 );
+
+                const double fit_thresh = (energy == 100) ? 0.1 : 0.25;
 
                 TFitResultPtr fitResult = FitPeakWithTSpectrum(Charge_Calo_crystal, fit_thresh);
                 if (fitResult.Get() != nullptr) {
@@ -55,8 +57,8 @@ void AnalyzePeakCrystal(const double x_min, const double x_max, const double fit
                     double meanChargeErr = fitResult->ParError(1);
                     double stdCharge = fitResult->Parameter(2);
                     PrintMeasurement(meanCharge, meanChargeErr);
-                    if (meanCharge / stdCharge - 1 < 0.1 || stdCharge == 0.) {
-                        std::cout << "Skipping fit because the mean/std charge ratio is close to 1" << std::endl;
+                    if (meanCharge / stdCharge - 1 < 0.1 || stdCharge == 0. || meanCharge / meanChargeErr - 1 < 0.5) {
+                        std::cout << "Skipping fit because the mean/std or mean/meanErr charge ratios are close to 1" << std::endl;
                         continue;
                     }
                 } else {

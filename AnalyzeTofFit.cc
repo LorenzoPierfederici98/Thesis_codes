@@ -63,8 +63,8 @@ void ProcessAndPlot(const std::string& fileName, double energy,
                 
                 // Debug: Print fit results
                 std::cout << "Fit Results for " << histo << " at Energy: " << energy << std::endl;
-                std::cout << "Mean: " << res.mean << " +/- " << res.meanError << std::endl;
-                std::cout << "Sigma: " << res.sigma << " +/- " << res.sigmaError << std::endl;
+                std::cout << "Mean: " << res.mean << " ± " << res.meanError << std::endl;
+                std::cout << "Sigma: " << res.sigma << " ± " << res.sigmaError << std::endl;
             }
             delete fitFunc;
         } else {
@@ -115,15 +115,16 @@ void PlotResults(const std::map<TString, std::vector<std::pair<double, FitResult
     meanGraph[0]->SetMinimum(0.);
     double xmean_max = meanGraph[0]->GetXaxis()->GetXmax();
     meanGraph[0]->GetXaxis()->SetLimits(0., xmean_max);
-    meanGraph[0]->GetYaxis()->SetRangeUser(0, 12.);
     meanGraph[0]->Draw("AP");
     meanGraph[1]->Draw("P SAME");
     meanGraph[2]->Draw("P SAME");
 
-    TLegend* legend_mean = new TLegend(0.7, 0.3, 0.9, 0.5);
+    TLegend* legend_mean = new TLegend(0.3, 0.3, 0.8, 0.5);  // (x1, y1, x2, y2) in normalized coordinates
     legend_mean->AddEntry(meanGraph[0], "Mean ToF", "P");
     legend_mean->AddEntry(meanGraph[1], "Mean ToF Central Bars (8, 9, 10)", "P");
     legend_mean->AddEntry(meanGraph[2], "Mean ToF Bar 9(X), Bar 9(Y)", "P");  // Entry for the new graph
+    legend_mean->SetBorderSize(0);  // No border
+    legend_mean->SetTextSize(0.03);
     legend_mean->Draw();
     canvas->SaveAs("Plots/Merged_Mean_ToF_Fit.png");
     delete legend_mean;
@@ -135,15 +136,16 @@ void PlotResults(const std::map<TString, std::vector<std::pair<double, FitResult
     sigmaGraph[0]->SetMinimum(0.);
     double xsigma_max = sigmaGraph[0]->GetXaxis()->GetXmax();
     sigmaGraph[0]->GetXaxis()->SetLimits(0., xsigma_max);
-    sigmaGraph[0]->GetYaxis()->SetRangeUser(0, 0.2);
     sigmaGraph[0]->Draw("AP");
     sigmaGraph[1]->Draw("P SAME");
     sigmaGraph[2]->Draw("P SAME");
 
-    TLegend* legend_sigma = new TLegend(0.7, 0.3, 0.9, 0.5);
+    TLegend* legend_sigma = new TLegend(0.5, 0.3, 0.85, 0.5);
     legend_sigma->AddEntry(sigmaGraph[0], "#sigma ToF", "P");
     legend_sigma->AddEntry(sigmaGraph[1], "#sigma ToF Central Bars (8, 9, 10)", "P");
     legend_sigma->AddEntry(sigmaGraph[2], "#sigma ToF Bar 9(X), Bar 9(Y)", "P");  // Entry for the new graph
+    legend_sigma->SetBorderSize(0);  // No border
+    legend_sigma->SetTextSize(0.03);
     legend_sigma->Draw();
     canvas->SaveAs("Plots/Merged_Sigma_ToF_Fit.png");
 
