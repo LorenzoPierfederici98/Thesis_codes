@@ -5,3 +5,5 @@
 #include <TLegend.h>    // For legends (optional, only if needed)
 #include <iostream>     // For input/output operations (std::cerr)
 #endif
+
+bool ScaleCrystalIDMap(TH2D* hCalMapCrystalID, TFile* inFile);

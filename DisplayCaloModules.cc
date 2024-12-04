@@ -8,6 +8,11 @@ void DisplayCaloModules() {
     int modules[7] = {7, 6, 5, 4, 3, 2, 1};  // List of modules
     gStyle->SetOptStat(0);  // Display histogram stats (name and entries)
 
+    std::map<int, std::pair<int, int>> crystalIDMapping = {
+        {4, {0, 8}}, {5, {9, 17}}, {6, {27, 35}},
+        {3, {18, 26}}, {2, {36, 44}}, {1, {54, 62}}, {7, {45, 53}}
+    };
+
     std::vector<std::pair<std::string, double>> filesAndEnergies = {
         {"Calo/AnaFOOT_Calo_Decoded_HIT2022_100MeV.root", 100},
         {"Calo/AnaFOOT_Calo_Decoded_HIT2022_140MeV.root", 140},
@@ -52,6 +57,8 @@ void DisplayCaloModules() {
             // Retrieve and draw `hCalMapCrystalID` histogram (Crystal IDs)
             TH2D* hCalMapCrystalID = (TH2D*)inFile->Get(Form("hCalMapCrystalID_module_%d", moduleID));
             if (hCalMapCrystalID) {
+                bool scaled = ScaleCrystalIDMap(hCalMapCrystalID, inFile);
+                if (!scaled) continue;
                 hCalMapCrystalID->SetMinimum(0);  //the 0 value has to be displayed, it would be neglected instead
                 gStyle->SetPaintTextFormat("1.0f");  // Format to display even small values like 0
                 hCalMapCrystalID->SetTitle("");
@@ -79,5 +86,42 @@ void DisplayCaloModules() {
         inFile->Close();
         delete inFile;
     }
+}
+
+bool ScaleCrystalIDMap(TH2D* hCalMapCrystalID, TFile* inFile) {
+    // Count the number of TObjString objects with names like "nentries run XXXX"
+    TList* objList = (TList*)inFile->GetListOfKeys();
+    int nentriesCount = 0;
+    
+    if (objList) {
+        for (int i = 0; i < objList->GetSize(); ++i) {
+            TKey* key = (TKey*)objList->At(i);
+            if (key->GetClassName() == TString("TObjString")) {
+                TString objName = key->GetName();  // Get the name of the object, not its content
+                if (objName.Contains("nentries run")) {
+                    nentriesCount++;  // Increment for each "nentries run" object
+                }
+            }
+        }
+    }
+
+    // If there are no "nentries run" objects, we can't scale the values
+    if (nentriesCount == 0) {
+        std::cerr << "Warning: No 'nentries run' objects found in file. Scaling skipped." << std::endl;
+        return false;
+    }
+
+    cout << inFile->GetName() << " # of merged files: " << nentriesCount << endl;
+    
+    // Scale the hCalMapCrystalID values by the number of merged files (nentriesCount)
+    for (int xBin = 1; xBin <= hCalMapCrystalID->GetNbinsX(); ++xBin) {
+        for (int yBin = 1; yBin <= hCalMapCrystalID->GetNbinsY(); ++yBin) {
+            double binContent = hCalMapCrystalID->GetBinContent(xBin, yBin);
+            if (binContent > 0 && nentriesCount > 0) {
+                hCalMapCrystalID->SetBinContent(xBin, yBin, binContent / nentriesCount);
+            }
+        }
+    }
+    return true;
 }
 
