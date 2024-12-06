@@ -7,6 +7,9 @@
 
 #include "AnalyzeTWFit.h"
 
+double DENSITY = 1.023;  //EJ200 density g/cm^3
+double THICKNESS = 0.3;  //slab scintillator thickness cm
+
 // Main analysis function
 void AnalyzeTWFit() {
     std::vector<std::pair<std::string, double>> filesAndEnergies = {
@@ -19,13 +22,20 @@ void AnalyzeTWFit() {
 
     std::map<TString, std::map<int, double>> fitMeans;
     std::map<TString, std::map<int, double>> fitErrors;
+    std::map<int, double> stopping_power = {
+    {100, 7.245},
+    {140, 5.674},
+    {180, 4.777},
+    {200, 4.458},
+    {220, 4.196}
+    };  // stopping power for protons, MeV*cm^2/g, to be multiplied by 4, density and thickness to obtain E_loss
 
     for (const auto& [fileName, energy] : filesAndEnergies) {
         ProcessFile(fileName, energy, fitMeans, fitErrors);
     }
 
     for (const auto& layerBarEntry : fitMeans) {
-        CreateAndSaveGraph(layerBarEntry.first, layerBarEntry.second, fitErrors);
+        CreateAndSaveGraph(layerBarEntry.first, layerBarEntry.second, fitErrors, stopping_power);
     }
 }
 
@@ -147,7 +157,8 @@ void ProcessFile(
 void CreateAndSaveGraph(
     const TString& layerBarCombination, 
     const std::map<int, double>& energiesAndFits, 
-    const std::map<TString, std::map<int, double>>& fitErrors
+    const std::map<TString, std::map<int, double>>& fitErrors,
+    std::map<int, double>& stopping_power
 ) {
     TGraphErrors* graph = new TGraphErrors();
     graph->SetMinimum(0.0);
@@ -155,7 +166,9 @@ void CreateAndSaveGraph(
 
     for (const auto& [energy, fitMean] : energiesAndFits) {
         double fitError = fitErrors.at(layerBarCombination).at(energy);
-        graph->SetPoint(pointIndex, energy, fitMean);
+        double e_loss = stopping_power[energy] * 4 * DENSITY * THICKNESS;
+        cout << "Beam Energy: " << energy << " MeV " << "E_loss: " << e_loss << " MeV" << endl;
+        graph->SetPoint(pointIndex, e_loss, fitMean);
         graph->SetPointError(pointIndex, 0, fitError);
         ++pointIndex;
     }
@@ -164,8 +177,8 @@ void CreateAndSaveGraph(
     graph->GetXaxis()->SetLimits(0., x_max);
 
     TCanvas* c = new TCanvas("c", "Fit Results", 800, 600);
-    graph->SetTitle(Form("Merged Fit Mean Charge vs Beam Energy for %s", layerBarCombination.Data()));
-    graph->GetXaxis()->SetTitle("Beam Energy [MeV]");
+    graph->SetTitle(Form("Merged Fit Mean Charge vs Energy Loss for %s", layerBarCombination.Data()));
+    graph->GetXaxis()->SetTitle("Energy Loss [MeV]");
     graph->GetYaxis()->SetTitle("Mean Charge [a.u.]");
     c->SetLeftMargin(0.15);
     graph->SetMarkerStyle(24);

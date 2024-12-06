@@ -34,5 +34,6 @@ void ProcessFile(
 void CreateAndSaveGraph(
     const TString& layerBarCombination, 
     const std::map<int, double>& energiesAndFits, 
-    const std::map<TString, std::map<int, double>>& fitErrors
+    const std::map<TString, std::map<int, double>>& fitErrors,
+    std::map<int, double>& stopping_power
 );
