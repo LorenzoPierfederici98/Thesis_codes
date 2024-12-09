@@ -176,15 +176,59 @@ void CreateAndSaveGraph(
     double x_max = graph->GetXaxis()->GetXmax();
     graph->GetXaxis()->SetLimits(0., x_max);
 
-    TCanvas* c = new TCanvas("c", "Fit Results", 800, 600);
-    graph->SetTitle(Form("Merged Fit Mean Charge vs Energy Loss for %s", layerBarCombination.Data()));
-    graph->GetXaxis()->SetTitle("Energy Loss [MeV]");
-    graph->GetYaxis()->SetTitle("Mean Charge [a.u.]");
-    c->SetLeftMargin(0.15);
-    graph->SetMarkerStyle(24);
-    graph->Draw("AP");
+    // Perform linear fit
+    TF1 *f1 = new TF1("f1", "pol1", 0., x_max);
+    TFitResultPtr fitresult_linear = graph->Fit(f1, "S");
 
-    c->SaveAs(Form("Plots/Merged_Fit_%s.png", layerBarCombination.Data()));
-    delete c;
-    delete graph;
+    if (!fitresult_linear.Get() || fitresult_linear->Status() != 0) {
+        std::cerr << "Linear fit failed for " << layerBarCombination.Data() << std::endl;
+    } else {
+        auto [intercept, sigma_intercept] = RoundMeasurement(fitresult_linear->Parameter(0), fitresult_linear->ParError(0));
+        auto [slope, sigma_slope] = RoundMeasurement(fitresult_linear->Parameter(1), fitresult_linear->ParError(1));
+        double chi2 = fitresult_linear->Chi2();
+        int ndf = fitresult_linear->Ndf();
+
+        TPaveText *fitInfo = new TPaveText(0.3, 0.7, 0.45, 0.85, "NDC");
+        fitInfo->SetFillColor(0);
+        fitInfo->AddText(Form("Intercept [a.u.] = %f#pm %f", intercept, sigma_intercept));
+        fitInfo->AddText(Form("Slope [a.u. / MeV] = %f#pm %f", slope, sigma_slope));
+        fitInfo->AddText(Form("#chi^{2} / ndf = %.2f / %d", chi2, ndf));
+        fitInfo->SetTextSize(0.03);
+
+        f1->SetParameter(0, intercept);
+        f1->SetParameter(1, slope);
+
+        TCanvas* c = new TCanvas("c", "Fit Results", 800, 600);
+        graph->SetTitle(Form("Merged Fit Mean Charge vs Energy Loss for %s", layerBarCombination.Data()));
+        graph->GetXaxis()->SetTitle("Energy Loss [MeV]");
+        graph->GetYaxis()->SetTitle("Mean Charge [a.u.]");
+        c->SetLeftMargin(0.15);
+        graph->SetMarkerStyle(24);
+        graph->Draw("AP");
+
+        f1->Draw("same");
+        c->cd();
+        fitInfo->Draw("same");
+        c->Modified();
+        c->Update();
+
+        c->SaveAs(Form("Plots/Merged_Fit_%s.png", layerBarCombination.Data()));
+        delete c;
+        delete graph;
+        delete fitInfo;
+    }
+}
+
+pair<double, double> RoundMeasurement(double value, double uncertainty) {
+    //Get the order of magnitude of the uncertainty
+    int significantFigures = (int)std::ceil(-std::log10(uncertainty)) + 1;
+
+    //Calculate the rounding factor based on significant figures
+    double roundingFactor = std::pow(10, significantFigures);
+
+    //Round the uncertainty and value accordingly
+    double roundedUncertainty = std::round(uncertainty * roundingFactor) / roundingFactor;
+    double roundedValue = std::round(value * roundingFactor) / roundingFactor;
+
+    return {roundedValue, roundedUncertainty};
 }

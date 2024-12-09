@@ -37,3 +37,5 @@ void CreateAndSaveGraph(
     const std::map<TString, std::map<int, double>>& fitErrors,
     std::map<int, double>& stopping_power
 );
+
+pair<double, double> RoundMeasurement(double value, double uncertainty);

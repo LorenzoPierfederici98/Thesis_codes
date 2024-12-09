@@ -8,11 +8,6 @@ void DisplayCaloModules() {
     int modules[7] = {7, 6, 5, 4, 3, 2, 1};  // List of modules
     gStyle->SetOptStat(0);  // Display histogram stats (name and entries)
 
-    std::map<int, std::pair<int, int>> crystalIDMapping = {
-        {4, {0, 8}}, {5, {9, 17}}, {6, {27, 35}},
-        {3, {18, 26}}, {2, {36, 44}}, {1, {54, 62}}, {7, {45, 53}}
-    };
-
     std::vector<std::pair<std::string, double>> filesAndEnergies = {
         {"Calo/AnaFOOT_Calo_Decoded_HIT2022_100MeV.root", 100},
         {"Calo/AnaFOOT_Calo_Decoded_HIT2022_140MeV.root", 140},
