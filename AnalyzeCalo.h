@@ -161,6 +161,7 @@ Bool_t readBinTwCalibFile = false;
 enum{kCharges=8,kLayers=2,kBars=20};  //TW
 enum{kModules=7, kCrysPerModule=9};  //Calorimeter
 // enum{kCharges=8,kLayers=2,kCentralBars=3};
+enum{max_cluster_number=10};
 enum{kVTreg=2,kTWreg=4};
 enum FlukaVar {kPrimaryID=0,kNeutronFlukaId=8};
 enum TrigID {kTrigsN=4,kMBplusVeto=0,kVeto=1,kMB=40,kSTtrig=42};
@@ -190,6 +191,10 @@ typedef std::vector<std::pair<Int_t,Int_t> > TVecPair;
 TH1D *Charge_Calo_total;  //charge in all calo
 TH1D *Charge_Calo_Module[kModules];  //charge per module in calo
 TH1D *Charge_Calo_crystal[kModules * kCrysPerModule];  //charge per crystal id in calo
+
+TH1D *Clusters_number;
+TH2D *hClusterSize_Charge[kModules * kCrysPerModule];
+//TH2D *hCalClusterPos[max_cluster_number];
 
 TH2D *hCalMapPos[kModules];  //2D histogram of x, y positions in the calorimeter
 TH2D *hCalMapCrystalID[kModules];  //2D histogram of crystalID in modules

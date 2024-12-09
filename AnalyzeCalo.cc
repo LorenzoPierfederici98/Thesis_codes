@@ -219,10 +219,28 @@ void AnalyzeCalo(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t ne
         hCalMapCrystalID[ModuleID]->GetYaxis()->FindBin(CaloPosition.Y()),
         valueToSet
       );
+    }
 
-      if (ModuleID == 6)
-        cout << "x: " << CaloPosition.X() << " y: " << CaloPosition.Y() << " z: " << CaloPosition.Z() << " ID: " << crystal_id << " module: " << ModuleID << endl;
-}
+    Int_t nClusters = caNtuClus->GetClustersN();  // number of clusters
+    Clusters_number->Fill(nClusters);
+    for (int icluster = 0; icluster < nClusters; icluster++){
+      TACAcluster *cluster = caNtuClus->GetCluster(icluster);
+      if (!cluster)
+        continue;
+
+      Int_t nClusterHits = cluster->GetHitsN();  // i.e. cluster size
+      for (int iclusterhit = 0; iclusterhit < nClusterHits; iclusterhit++){
+        TACAhit *hit = cluster->GetHit(iclusterhit);
+        if (!hit)
+          continue;
+        //TVector3 ClusterHitPos = hit->GetPosition();
+        Int_t crystal_id = hit->GetCrystalId();
+        Double_t charge_cluster = hit->GetCharge();
+        hClusterSize_Charge[crystal_id]->Fill(charge_cluster, nClusterHits);
+        //Charge_Cluster_crystal[icluster][crystal_id]->Fill(charge_cluster);
+        //hCalClusterPos[icluster]->Fill(ClusterHitPos.X(), ClusterHitPos.Y());
+      }
+    }
 
     
   } // close for loop over events
@@ -268,9 +286,13 @@ void BookHistograms()
 
   Charge_Calo_total = new TH1D(Form("Charge_Calo"), Form("Charge_Calo"), 500, 0., 1.5);
 
+  Clusters_number = new TH1D(Form("Clusters_number"), Form("Clusters_number"), 100, -1., 5.);
+
   for(int icrystal=0; icrystal < kModules*kCrysPerModule; icrystal++)
   {
     Charge_Calo_crystal[icrystal] = new TH1D(Form("Charge_Calo_crystalId_%d", icrystal), Form("Charge_Calo_crystalID_%d", icrystal), 500, -0.2, 1.);
+
+    hClusterSize_Charge[icrystal] = new TH2D(Form("ClusterSize_Charge_crystalId_%d", icrystal), Form("ClusterSize_Charge_crystalId_%d", icrystal), 500, -0.2, 1., 100, -1., 5.);
   }
   for(int imodule=0; imodule < kModules; imodule++)
   {
@@ -278,6 +300,7 @@ void BookHistograms()
     hCalMapCrystalID[imodule] = new TH2D(Form("hCalMapCrystalID_module_%d", modules[imodule]), Form("hCalMapCrystalID_module_%d", modules[imodule]), 27, -27., 27., 11, -11., 11.);
     Charge_Calo_Module[imodule] = new TH1D(Form("Charge_Calo_Module_%d", modules[imodule]), Form("Charge_Calo_Module_%d", modules[imodule]), 200, 0., 1.);
   }
+
 
   return;
 }

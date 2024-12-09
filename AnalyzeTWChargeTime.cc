@@ -201,33 +201,27 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
     {
 
       TATWhit *hitX = twNtuHit->GetHit(ihitX, (Int_t)LayerX);
+      if (!hitX->IsValid()) continue;
       Double_t posAlongX = hitX->GetPosition(); // it provides the X coordinate
       Double_t posBarY = twparGeo->GetBarPosition((Int_t)LayerX, hitX->GetBar())[1];
       Double_t barX = hitX->GetBar();
-      if (hitX->GetEnergyLoss() > 0)
-      {
-        Bar_ID_X->Fill(barX);
-        PosX->Fill(posAlongX);
-      }
+
+      Bar_ID_X->Fill(barX);
+      PosX->Fill(posAlongX);
 
       for (int ihitY = 0; ihitY < nHitsY; ihitY++)
       {
 
         TATWhit *hitY = twNtuHit->GetHit(ihitY, (Int_t)LayerY);
+        if (!hitY->IsValid()) continue;
         Double_t posAlongY = hitY->GetPosition(); // it provides the Y coordinate
         Double_t posBarX = twparGeo->GetBarPosition((Int_t)LayerY, hitY->GetBar())[0];
         Double_t tof_y_bar9 = hitY->GetToF();
         Double_t barY = hitY->GetBar();
-        if (hitY->GetEnergyLoss() > 0)
-        {
-          Bar_ID_Y->Fill(barY);
-          PosY->Fill(posAlongY);
-        }
-        // Only fill hTwMapPos if both hitX and hitY have EnergyLoss > 0
-        if (hitX->GetEnergyLoss() > 0 && hitY->GetEnergyLoss() > 0)
-        {
-          hTwMapPos->Fill(posAlongX, posAlongY);
-        }
+
+        Bar_ID_Y->Fill(barY);
+        PosY->Fill(posAlongY);
+        hTwMapPos->Fill(posAlongX, posAlongY);
 
         if (barX == 9 && barY == 9)
         {
@@ -252,33 +246,38 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
 
     if (nHitsX == 1 && nHitsY == 1)
     {
+      Double_t posAlongX = 999, posBarX = 999, posAlongY = 999, posBarY = 999;
+      Int_t barID_1hit_X = -1, barID_1hit_Y = -1;
 
       TATWhit *hitX = twNtuHit->GetHit(0, (Int_t)LayerX);
+      if (hitX->IsValid()) {
       Double_t posAlongX = hitX->GetPosition(); // it provides the X coordinate
       Int_t barID_1hit_X = hitX->GetBar();
       Double_t posBarY = twparGeo->GetBarPosition((Int_t)LayerX, barID_1hit_X)[1];
       Double_t chargeAX = hitX->GetChargeChA();
       Double_t chargeBX = hitX->GetChargeChB();
-      if (chargeAX < 0)
-        chargeAX = 0;
-      if (chargeBX < 0)
-        chargeBX = 0;
+      }
 
       TATWhit *hitY = twNtuHit->GetHit(0, (Int_t)LayerY);
-      Double_t posAlongY = hitY->GetPosition(); // it provides the Y coordinate
-      Int_t barID_1hit_Y = hitY->GetBar();
-      Double_t posBarX = twparGeo->GetBarPosition((Int_t)LayerY, barID_1hit_Y)[0];
-      Double_t chargeAY = hitY->GetChargeChA();
-      Double_t chargeBY = hitY->GetChargeChB();
-      if (chargeAY < 0)
-        chargeAY = 0;
-      if (chargeBY < 0)
-        chargeBY = 0;
+      if (hitY->IsValid()) {
+        Double_t posAlongY = hitY->GetPosition(); // it provides the Y coordinate
+        Int_t barID_1hit_Y = hitY->GetBar();
+        Double_t posBarX = twparGeo->GetBarPosition((Int_t)LayerY, barID_1hit_Y)[0];
+        Double_t chargeAY = hitY->GetChargeChA();
+        Double_t chargeBY = hitY->GetChargeChB();
+      }
 
-      hResX_1Cross->Fill(posAlongX - posBarX);
-      hResY_1Cross->Fill(posAlongY - posBarY);
-      hTwMapPos_1Cross->Fill(posAlongX, posAlongY);
-      hBarID_1Cross->Fill(barID_1hit_X, barID_1hit_Y);
+      if (
+      hitX->IsValid() && hitY->IsValid() && 
+      posAlongX != 999 && posBarX != 999 && 
+      posAlongY != 999 && posBarY != 999 &&
+      barID_1hit_X != -1 && barID_1hit_Y != -1
+      ) {
+        hResX_1Cross->Fill(posAlongX - posBarX);
+        hResY_1Cross->Fill(posAlongY - posBarY);
+        hTwMapPos_1Cross->Fill(posAlongX, posAlongY);
+        hBarID_1Cross->Fill(barID_1hit_X, barID_1hit_Y);
+      }
     }
 
     Int_t nHits = twNtuHit->GetHitN();
@@ -290,7 +289,7 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
 
       TATWhit *hit = twNtuHit->GetHit(ihit);
 
-      if (!hit || !hit->IsValid())
+      if (!hit->IsValid())
         continue;
 
       Int_t bar = hit->GetBar();
@@ -455,9 +454,9 @@ void BookHistograms()
   Bar_ID_X = new TH1D("BarID_LayerX", "BarID_LayerX", 200, 0, 19);
   Bar_ID_Y = new TH1D("BarID_LayerY", "BarID_LayerY", 200, 0, 19);
 
-  hToF = new TH1D("ToF_TW", "ToF_TW", 220, 6., 12.);
-  hToF_CentralBars = new TH1D("ToF_TW_CentralBars", "ToF_TW_CentralBars", 220, 6., 12.);
-  hToF_Bar9 = new TH1D("ToF_Bar9_XY", "ToF_Bar9_XY", 220, 6., 12.);
+  hToF = new TH1D("ToF_TW", "ToF_TW", 220, 6., 20.);
+  hToF_CentralBars = new TH1D("ToF_TW_CentralBars", "ToF_TW_CentralBars", 220, 6., 20.);
+  hToF_Bar9 = new TH1D("ToF_Bar9_XY", "ToF_Bar9_XY", 220, 6., 20.);
 
   for (int ilay = 0; ilay < kLayers; ilay++)
   {
