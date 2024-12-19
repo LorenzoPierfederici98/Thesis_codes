@@ -14,6 +14,7 @@
 #include <map>             // For using std::map containers
 #include <utility>         // For std::pair (energy, fit result)
 #include <regex>           // For regular expressions (if you're filtering object names)
+#include <cmath>           // Required for sqrt
 #endif
 
 struct FitResult {
