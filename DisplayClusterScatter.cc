@@ -1,16 +1,8 @@
 
 #include "DisplayClusterScatter.h"
 
-#include <TFile.h>
-#include <TH2D.h>
-#include <TGraph.h>
-#include <TCanvas.h>
-#include <TString.h>
-#include <iostream>
-#include <vector>
-#include <string>
-
 void DisplayClusterScatter() {
+    gStyle->SetOptStat(0);  // Display histogram stats (name and entries)
     std::vector<std::pair<std::string, double>> filesAndEnergies = {
         {"Calo/AnaFOOT_Calo_Decoded_HIT2022_100MeV.root", 100},
         {"Calo/AnaFOOT_Calo_Decoded_HIT2022_140MeV.root", 140},
@@ -34,41 +26,23 @@ void DisplayClusterScatter() {
                 continue;
             }
 
-            TCanvas *c = new TCanvas("c", "Scatter Plot from 2D Histogram", 800, 600);
-            TGraph *scatterPlot = new TGraph();
+            // Create a canvas to draw the histogram
+            TCanvas *c = new TCanvas("c", "2D Histogram", 800, 600);
+            c->SetRightMargin(0.15);  // Increase right margin to accommodate the color bar
+            gPad->SetLogz(1);
+            gStyle->SetPalette(1);
+            h2->SetTitle(Form("Cluster Size vs. Charge Beam Energy: %.0f MeV | Crystal ID: %d", energy, crystal_ID));
+            h2->GetXaxis()->SetTitle("Charge [a.u.]");
+            h2->GetYaxis()->SetTitle("Cluster Size");
+            h2->Draw("COLZ");  // Draw as a 2D colored histogram
 
-            int pointIndex = 0;
-            // Loop over all bins in the 2D histogram
-            for (int binX = 1; binX <= h2->GetNbinsX(); ++binX) {
-                for (int binY = 1; binY <= h2->GetNbinsY(); ++binY) {
-                    double binContent = h2->GetBinContent(binX, binY);
-                    if (binContent > 0) { // Include only non-empty bins
-                        double x = h2->GetXaxis()->GetBinCenter(binX);
-                        double y = h2->GetYaxis()->GetBinCenter(binY);
+            // Save the histogram as a PNG file
+            c->SaveAs(Form("Plots/ClusterCharge/Merged_Histogram_Cluster_Crystal_%d_%.0fMeV.png", crystal_ID, energy));
 
-                        // Add a point for each occurrence of the bin content
-                        for (int i = 0; i < static_cast<int>(binContent); ++i) {
-                            scatterPlot->SetPoint(pointIndex++, x, y);
-                        }
-                    }
-                }
-            }
-
-            // Customize and draw the scatter plot
-            scatterPlot->SetMarkerStyle(20);  // Set marker style
-            scatterPlot->SetMarkerSize(0.8);  // Set marker size
-            scatterPlot->SetTitle(Form("Scatter Plot Cluster Size-Charge Beam Energy HE: %.0f MeV | Crystal ID: %d", energy, crystal_ID));
-            scatterPlot->GetXaxis()->SetTitle("Charge [a.u.]");
-            scatterPlot->GetYaxis()->SetTitle("Cluster Size");
-
-            scatterPlot->Draw("AP");
-            c->SaveAs(Form("Plots/ClusterCharge/Merged_ScatterPlot_Cluster_Crystal_%d_%.0fMeV.png", crystal_ID, energy));
-
-            delete scatterPlot;
-            delete c;
+            delete c;  // Clean up canvas
         }
 
         inFile->Close();
-        delete inFile;
+        delete inFile;  // Clean up input file
     }
 }
