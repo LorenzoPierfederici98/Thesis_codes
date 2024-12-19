@@ -202,9 +202,8 @@ TH1D *Bar_ID_X;  //bar ID for a given layer
 TH1D *Bar_ID_Y;
 TH1D *PosX_Bar9;
 TH1D *PosY_Bar9;
-TH1D *hToF;
-TH1D *hToF_CentralBars;
-TH1D *hToF_Bar9;  //tof on y when both hitX and hitY are on bar 9
+TH1D *hToF_Bar9;   //tof on y when both hitX and hitY are on bar 9
+TH1D *hToF_Bar8;  //tof on y when both hitX and hitY are on bar 8
 
 // TH2D *dE_vs_tof_perBar[kLayers][kBars];
 TH1D *heloss_all;

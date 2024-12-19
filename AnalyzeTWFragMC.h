@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <TCanvas.h>
 #include <fstream>
 #include <iostream>
 #include <iomanip>
@@ -16,12 +15,10 @@
 #include <TFile.h>
 #include <TTree.h>
 #include <TString.h>
-#include <TObjString.h>
 #include <TVector3.h>
 #include <TH1.h>
 #include <TROOT.h>
 #include <TKey.h>
-#include <TLatex.h>
 
 #include "TAGcampaignManager.hxx"
 #include "TAGactTreeReader.hxx"
@@ -155,14 +152,12 @@ static int  IncludeDAQ;
 static int  IncludeWD;
 
 Bool_t debug              = false;
-Bool_t calibTw            = false;
+Bool_t calibTw            = true;  // true form MC
 Bool_t isTwScan           = true;
-Bool_t readBinTwCalibFile = false;
+Bool_t readBinTwCalibFile = true;
 
-enum{kCharges=8,kLayers=2,kBars=20};  //TW
-enum{kModules=7, kCrysPerModule=9};  //Calorimeter
+enum{kCharges=8,kLayers=2,kBars=20};
 // enum{kCharges=8,kLayers=2,kCentralBars=3};
-enum{max_cluster_number=10};
 enum{kVTreg=2,kTWreg=4};
 enum FlukaVar {kPrimaryID=0,kNeutronFlukaId=8};
 enum TrigID {kTrigsN=4,kMBplusVeto=0,kVeto=1,kMB=40,kSTtrig=42};
@@ -179,7 +174,7 @@ const Int_t maxTGy = 10;
 const TString ElementName[kCharges+1] = {"H","He","Li","Be","B","C","N","O"};
 const TString ElementName_with_n[kCharges+1] = {"n","H","He","Li","Be","B","C","N","O"};
 
-//const Int_t  CentralBarsID[kCentralBars] = {8,9,10}; // for both the layers 
+// const Int_t   CentralBarsID[kCentralBars] = {8,9,10}; // for both the layers 
 
 typedef std::map<Int_t,std::vector<Int_t> > TMapMatch;
 typedef std::vector<std::pair<Int_t,Int_t> > TVecPair;
@@ -189,18 +184,22 @@ typedef std::vector<std::pair<Int_t,Int_t> > TVecPair;
 // TH1F*           fpHisSeedMap[MaxPlane];    ///< seed map
 // TH1F*           fpHisStripMap[MaxPlane];   ///< strip map
 
-TH1D *Charge_Calo_total;  //charge in all calo
-TH1D *Charge_Calo_Module[kModules];  //charge per module in calo
-TH1D *Charge_Calo_crystal[kModules * kCrysPerModule];  //charge per crystal id in calo
-TH1D *Charge_Calo_crystal_cluster[2];
+TH2D *dE_vs_tof[kLayers];
+TH2D *dE_vs_tof_perBar[kLayers][nBarsPerLayer];
+// TH2D *dE_vs_tof_perBar[kLayers][kBars];
+TH1D *heloss_all;
+// TH1D *heloss[kTrigsN];;
+TH2D *hTwPos[kLayers];
+TH2D *hTwMapPos;
+TH2D *hTwMapPos_TWpntBin;
+TH2D *hTwMapPos_TWpnt;
+TH2D *hTwMapPos_TWpnt_Z[kCharges];
+TH1D *hResX[kCharges];
+TH1D *hResY[kCharges];
+TH2D *hTwMapPos_1Cross;
+TH1D *hResX_1Cross;
+TH1D *hResY_1Cross;
 
-TH1D *Clusters_size;
-TH1D *Clusters_number;
-TH2D *hClusterSize_Charge[kModules * kCrysPerModule];
-//TH2D *hCalClusterPos[max_cluster_number];
-
-TH2D *hCalMapPos[kModules];  //2D histogram of x, y positions in the calorimeter
-TH2D *hCalMapCrystalID[kModules];  //2D histogram of crystalID in modules
 
 void  InitializeContainers();
 void  BookHistograms();
@@ -208,6 +207,9 @@ void  GetFOOTgeo(TAGcampaignManager* camp_manager, Int_t run_number);
 void  GetRunAndGeoInfo( TAGcampaignManager* campManager, Int_t runNumber);
 void  SetTreeBranchAddress(TAGactTreeReader *treeReader);
 void  ProjectTracksOnTw(int Z, TVector3 init_pos, TVector3 init_p);
+void  LoopOverMCtracks(Int_t Emin, Int_t Emax, Bool_t isnotrig);
+void  FillBinaryForTwCalib(Int_t eventN, Int_t nentries, Int_t runNumber);
+void  FillBinaryForTwCalib_MC(Int_t eventN, Int_t nentries, Int_t runNumber);
 
 Bool_t IsVTregion(int reg);
 

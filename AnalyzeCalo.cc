@@ -165,7 +165,9 @@ void AnalyzeCalo(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t ne
 
   // Loop over the TTree
   gTAGroot.BeginEventLoop();
-
+  //int pointIndex = 0;
+  //TCanvas *c = new TCanvas("c", "Scatter Plot", 800, 600);
+  //TGraph *scatterPlot = new TGraph();
   Int_t ev = -1;
   while (gTAGroot.NextEvent() && ev != nentries)
   {
@@ -197,7 +199,7 @@ void AnalyzeCalo(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t ne
 
     for (int ihit = 0; ihit < nHitsCalo; ihit++) {
       TACAhit *hit_ca = caNtuHit->GetHit(ihit);
-      if (!hit_ca)
+      if (!hit_ca || !hit_ca->IsValid())
           continue;
 
       Int_t crystal_id = hit_ca->GetCrystalId();
@@ -225,18 +227,33 @@ void AnalyzeCalo(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t ne
     Clusters_number->Fill(nClusters);
     for (int icluster = 0; icluster < nClusters; icluster++){
       TACAcluster *cluster = caNtuClus->GetCluster(icluster);
-      if (!cluster)
+      if (!cluster || !cluster->IsValid())
         continue;
 
       Int_t nClusterHits = cluster->GetHitsN();  // i.e. cluster size
+      Clusters_size->Fill(nClusterHits);
+
+      Double_t charge_cluster_total = 0;
+      // loop to find the total charge in the cluster
       for (int iclusterhit = 0; iclusterhit < nClusterHits; iclusterhit++){
         TACAhit *hit = cluster->GetHit(iclusterhit);
-        if (!hit)
+        if (!hit || !hit->IsValid())
+          continue;
+        Double_t charge_cluster = hit->GetCharge();
+        charge_cluster_total += charge_cluster;
+      }
+
+      for (int iclusterhit = 0; iclusterhit < nClusterHits; iclusterhit++){
+        TACAhit *hit = cluster->GetHit(iclusterhit);
+        if (!hit || !hit->IsValid())
           continue;
         //TVector3 ClusterHitPos = hit->GetPosition();
         Int_t crystal_id = hit->GetCrystalId();
         Double_t charge_cluster = hit->GetCharge();
-        hClusterSize_Charge[crystal_id]->Fill(charge_cluster, nClusterHits);
+        //if (crystal_id == 0) scatterPlot->SetPoint(pointIndex++, charge_cluster, nClusterHits);
+        if (crystal_id == 0 || crystal_id == 1)
+          Charge_Calo_crystal_cluster[crystal_id]->Fill(charge_cluster / charge_cluster_total);
+        hClusterSize_Charge[crystal_id]->Fill(charge_cluster / charge_cluster_total, nClusterHits);
         //Charge_Cluster_crystal[icluster][crystal_id]->Fill(charge_cluster);
         //hCalClusterPos[icluster]->Fill(ClusterHitPos.X(), ClusterHitPos.Y());
       }
@@ -244,13 +261,15 @@ void AnalyzeCalo(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t ne
 
     
   } // close for loop over events
-
+  //scatterPlot->SetMarkerStyle(20);  // Set marker style
+  //scatterPlot->SetTitle("Scatter Plot Cluster Size-Charge Crystal ID: 0");
   gTAGroot.EndEventLoop();
 
   cout << endl
        << "Job Done!" << endl;
 
   fout->cd();
+  //scatterPlot->Write("Scatter Plot Cluster Size-Charge Crystal ID: 0");
   fout->Write();
   fout->Close();
 
@@ -287,12 +306,15 @@ void BookHistograms()
   Charge_Calo_total = new TH1D(Form("Charge_Calo"), Form("Charge_Calo"), 500, 0., 1.5);
 
   Clusters_number = new TH1D(Form("Clusters_number"), Form("Clusters_number"), 100, -1., 5.);
+  Clusters_size = new TH1D(Form("Clusters_size"), Form("Clusters_size"), 100, -1., 20.);
 
   for(int icrystal=0; icrystal < kModules*kCrysPerModule; icrystal++)
   {
-    Charge_Calo_crystal[icrystal] = new TH1D(Form("Charge_Calo_crystalId_%d", icrystal), Form("Charge_Calo_crystalID_%d", icrystal), 500, -0.2, 1.);
+    Charge_Calo_crystal[icrystal] = new TH1D(Form("Charge_Calo_crystalId_%d", icrystal), Form("Charge_Calo_crystalID_%d", icrystal), 500, -0.2, 2.);
 
-    hClusterSize_Charge[icrystal] = new TH2D(Form("ClusterSize_Charge_crystalId_%d", icrystal), Form("ClusterSize_Charge_crystalId_%d", icrystal), 500, -0.2, 1., 100, -1., 5.);
+    hClusterSize_Charge[icrystal] = new TH2D(Form("ClusterSize_Charge_crystalId_%d", icrystal), Form("ClusterSize_Charge_crystalId_%d", icrystal), 200, 0., 1., 30, 0.5, 6.5);
+    if (icrystal == 0 || icrystal == 1)
+      Charge_Calo_crystal_cluster[icrystal] = new TH1D(Form("Charge_Calo_crystalId_%d_cluster", icrystal), Form("Charge_Calo_crystalID_%d_cluster", icrystal), 500, 0., 1.);
   }
   for(int imodule=0; imodule < kModules; imodule++)
   {
