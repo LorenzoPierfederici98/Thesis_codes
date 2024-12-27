@@ -7,6 +7,7 @@
 #include <TGraphErrors.h>
 #include <TCanvas.h>
 #include <TNamed.h>
+#include <TSpectrum.h>
 #include <iostream>
 #include <vector>
 #include <map>
@@ -25,6 +26,8 @@ void FitHistogramsInDirectory(
     std::map<TString, std::map<int, double>>& fitErrorsHe, 
     TFile* outputFile
 );
+
+std::pair<TFitResultPtr, TFitResultPtr> FitPeaksWithTSpectrum(TH1D *hist, double energy, double thresh_peak_low, double thresh_peak_high);
 
 void ProcessFile(
     const std::string& fileName, 

@@ -97,104 +97,134 @@ void ProcessFile(const TString& fileName,
     delete inputFile;
 }
 
-void PlotFitResultsCombined(const std::map<TString, std::map<int, double>>& fitMeansP,
-                            const std::map<TString, std::map<int, double>>& fitErrorsP,
-                            const std::map<TString, std::map<int, double>>& fitMeansHe,
-                            const std::map<TString, std::map<int, double>>& fitErrorsHe,
-                            std::map<int, double> elossP,
-                            std::map<int, double> elossHe) {
+void PlotFitResultsCombined(
+    const std::map<TString, std::map<int, double>>& fitMeansP,
+    const std::map<TString, std::map<int, double>>& fitErrorsP,
+    const std::map<TString, std::map<int, double>>& fitMeansHe,
+    const std::map<TString, std::map<int, double>>& fitErrorsHe,
+    const std::map<int, double>& elossP,
+    const std::map<int, double>& elossHe) {
+
     // Define the energies and layers
-    std::vector<int> energies = {100, 140, 200, 220};  // Different energies
-    std::vector<TString> layers = {"X", "Y"};  // Layers X and Y
-    int bar = 9;  // Only for bar 9
-    
-    // Loop over each energy and layer combination
-    for (int energy : energies) {
-        for (TString layer : layers) {
+    std::vector<int> energies = {100, 140, 200, 220};
+    std::vector<TString> layers = {"X", "Y"};
+
+    for (TString layer : layers) {
+        for (int bar = 0; bar < 20; ++bar) {
             TString layerBarName = Form("Layer%s_bar%d", layer.Data(), bar);
 
-            // Check if the data for both Proton and Helium exist for this energy and layer-bar combination
-            if (fitMeansP.find(layerBarName) == fitMeansP.end() || fitMeansHe.find(layerBarName) == fitMeansHe.end())
-                continue;
+            TGraphErrors* graphProtons = new TGraphErrors();
+            TGraphErrors* graphHeliums = new TGraphErrors();
+            TMultiGraph* multiGraph = new TMultiGraph();
 
-            // Create a graph for Proton and Helium in the same plot
-            TGraphErrors *graph = new TGraphErrors();
-            // Create a canvas for this energy and layer-bar combination
-            TCanvas *c = new TCanvas(Form("c_%s_%d", layerBarName.Data(), energy), 
-                                      Form("Fit Results - %s, Energy %d MeV", layerBarName.Data(), energy), 
+            int indexP = 0;
+            int indexHe = 0;
+
+            // Add proton points
+            for (int energy : energies) {
+                if (fitMeansP.count(layerBarName) && fitMeansP.at(layerBarName).count(energy)) {
+                    double meanP = fitMeansP.at(layerBarName).at(energy);
+                    double errorP = fitErrorsP.at(layerBarName).at(energy);
+                    graphProtons->SetPoint(indexP, elossP.at(energy), meanP);
+                    graphProtons->SetPointError(indexP, 0, errorP);
+                    ++indexP;
+                }
+            }
+
+            // Add helium points
+            for (int energy : energies) {
+                if (fitMeansHe.count(layerBarName) && fitMeansHe.at(layerBarName).count(energy)) {
+                    double meanHe = fitMeansHe.at(layerBarName).at(energy);
+                    double errorHe = fitErrorsHe.at(layerBarName).at(energy);
+                    graphHeliums->SetPoint(indexHe, elossHe.at(energy), meanHe);
+                    graphHeliums->SetPointError(indexHe, 0, errorHe);
+                    if (layerBarName == "LayerX_bar1" && energy == 220) {
+                        // Setting the fit point for LayerX_bar9 @220 MeV/u as an outlier.
+                        // Points with 0 error are ignored in the fit.
+                        graphHeliums->SetPointError(indexHe, 0, 0); 
+                    }
+                    ++indexHe;
+                }
+            }
+
+            if (graphProtons->GetN() == 0 && graphHeliums->GetN() == 0) {
+                delete graphProtons;
+                delete graphHeliums;
+                delete multiGraph;
+                continue;
+            }
+
+            graphProtons->SetMarkerStyle(20);
+            graphProtons->SetMarkerColor(kBlue);
+            graphHeliums->SetMarkerStyle(20);
+            graphHeliums->SetMarkerColor(kRed);
+
+            multiGraph->Add(graphProtons, "P");
+            multiGraph->Add(graphHeliums, "P");
+
+            TCanvas* c = new TCanvas(Form("c_%s", layerBarName.Data()), 
+                                      Form("Fit Results - %s", layerBarName.Data()), 
                                       800, 600);
 
-            int index = 0;
+            multiGraph->SetTitle(Form("%s - Fit Results", layerBarName.Data()));
+            multiGraph->GetXaxis()->SetTitle("Energy loss MC [MeV]");
+            multiGraph->GetYaxis()->SetTitle("Mean Charge [a.u.]");
+            multiGraph->Draw("A");
 
-            // Ensure both P and He data exist for the current energy
-            if (fitMeansP.at(layerBarName).find(energy) != fitMeansP.at(layerBarName).end() &&
-                fitMeansHe.at(layerBarName).find(energy) != fitMeansHe.at(layerBarName).end()) {
-
-                double meanP = fitMeansP.at(layerBarName).at(energy);
-                double errorP = fitErrorsP.at(layerBarName).at(energy);
-
-                double meanHe = fitMeansHe.at(layerBarName).at(energy);
-                double errorHe = fitErrorsHe.at(layerBarName).at(energy);
-
-                // Add Proton data (Red marker)
-                graph->SetPoint(index, elossP[energy], meanP);
-                graph->SetPointError(index, 0, errorP);
-                graph->SetMarkerColor(kRed);  // Proton color
-                index++;
-
-                // Add Helium data (Blue marker)
-                graph->SetPoint(index, elossHe[energy], meanHe);
-                graph->SetPointError(index, 0, errorHe);
-                graph->SetMarkerColor(kBlue);  // Helium color
-                index++;
+            // Combine data for fitting
+            TGraphErrors* combinedGraph = new TGraphErrors();
+            for (int i = 0; i < graphProtons->GetN(); ++i) {
+                double x, y;
+                graphProtons->GetPoint(i, x, y);
+                combinedGraph->SetPoint(combinedGraph->GetN(), x, y);
+                combinedGraph->SetPointError(combinedGraph->GetN() - 1, 0, graphProtons->GetErrorY(i));
+            }
+            for (int i = 0; i < graphHeliums->GetN(); ++i) {
+                double x, y;
+                graphHeliums->GetPoint(i, x, y);
+                combinedGraph->SetPoint(combinedGraph->GetN(), x, y);
+                combinedGraph->SetPointError(combinedGraph->GetN() - 1, 0, graphHeliums->GetErrorY(i));
             }
 
-            // Skip plotting if no common points exist
-            if (graph->GetN() == 0) {
-                delete graph;
-                continue;
-            }
+            // Perform the combined fit
+            double fit_min = 1.4267;
+            double fit_max = 9.7638;
 
-            // Set graph style and draw
-            graph->SetMarkerStyle(20);
-            //graph->SetLineColor(kBlack);
-            graph->SetTitle(Form("%s beam energy: %d MeV", layerBarName.Data(), energy));
-            graph->GetXaxis()->SetTitle("Energy loss MC [MeV]");
-            graph->GetYaxis()->SetTitle("Mean Charge [a.u.]");
-            graph->Draw("AP");
-            graph->SetMinimum(0.);
-            //graph->GetXaxis()->SetRangeUser(0., 10.);
+            //TF1* combinedFit = new TF1("combinedFit", "[0]*x", 0., fit_max);
+            TF1* combinedFit = new TF1("combinedFit", "[0]*x/(1 + [1]*x + [2]*x**2)", fit_min, fit_max);
+            combinedGraph->Fit(combinedFit);
+            combinedFit->SetLineColor(kRed);
 
-            // Fit the graph with the desired function: [0]*x/(1 + [1]*x)
-            //TF1* fitFunc = new TF1("fitFunc", "[0]*x/(1 + [1]*x)", 0., 20.);
-            TF1* fitFunc = new TF1("fitFunc", "[0]*x");
-            graph->Fit(fitFunc, "QR+");
-            // Extract the fit parameters: [0] and [1]
-            auto [param0, param0Error] = RoundMeasurement(fitFunc->GetParameter(0), fitFunc->GetParError(0));
-            //auto [param1, param1Error] = RoundMeasurement(fitFunc->GetParameter(1), fitFunc->GetParError(1));
+            // Draw the fit function
+            combinedFit->Draw("same");
 
-            //cout << "energy: " << energy << " " << layerBarName << " " << Form("(p0, p1) = (%s, %s)", param0.c_str(), param1.c_str()) << Form(" chisq/ndof: %.1e/%d ", fitFunc->GetChisquare(), fitFunc->GetNDF()) << endl;
+            // Add legend
+            TLegend* legend = new TLegend(0.15, 0.68, 0.48, 0.85);
+            legend->AddEntry(graphProtons, "Protons", "p");
+            legend->AddEntry(graphHeliums, "Heliums", "p");
+            auto [p0, p0Error] = RoundMeasurement(combinedFit->GetParameter(0), combinedFit->GetParError(0));
+            auto [p1, p1Error] = RoundMeasurement(combinedFit->GetParameter(1), combinedFit->GetParError(1));
+            auto [p2, p2Error] = RoundMeasurement(combinedFit->GetParameter(2), combinedFit->GetParError(2));
+            
+            legend->AddEntry((TObject*)0, Form("p_{0} = %s#pm%s", p0.c_str(), p0Error.c_str()), "");
+            legend->AddEntry((TObject*)0, Form("p_{1} = %s#pm%s", p1.c_str(), p1Error.c_str()), "");
+            legend->AddEntry((TObject*)0, Form("p_{2} = %s#pm%s", p2.c_str(), p2Error.c_str()), "");
+            legend->SetTextSize(0.02);
+            legend->Draw();
 
-            // Add fit results to the plot using TPaveText
-            TPaveText *pave = new TPaveText(0.15, 0.7, 0.45, 0.85, "NDC");  // Normalized coordinates
-            pave->SetFillColor(0);  // Transparent background
-            pave->SetLineColor(0);  // Transparent border
-            pave->SetShadowColor(0); // Remove the shadow
-            pave->SetTextAlign(12); // Align left
-            //pave->AddText(Form("Fit results:"));
-            pave->AddText(Form("slope [a.u./MeV] = %s#pm %s", param0.c_str(), param0Error.c_str()));
-            pave->SetTextSize(0.035);
-            //pave->AddText(Form("p_{0} [a.u./MeV] = %s#pm %s", param0.c_str(), param0Error.c_str()));
-            //pave->AddText(Form("p_{1} [1/MeV] = %s#pm %s", param1.c_str(), param1Error.c_str()));
-            pave->Draw();
+            c->SaveAs(Form("Plots/Fragmentation_%s.png", layerBarName.Data()));
 
-            c->SaveAs(Form("Plots/Fragmentation_%s_%dMeV.png", layerBarName.Data(), energy));
-
-            delete c; // Clean up the canvas
-            delete graph; // Clean up the graph
+            delete combinedFit;
+            delete combinedGraph;
+            delete graphProtons;
+            delete graphHeliums;
+            delete multiGraph;
+            delete legend;
+            delete c;
         }
     }
 }
+
 
 
 pair<std::string, std::string> RoundMeasurement(double value, double uncertainty) {
