@@ -90,6 +90,10 @@ void ProcessFile(const TString& fileName,
         fitErrorsP[layerBarName][energy] = errorP;
         fitMeansHe[layerBarName][energy] = meanHe;
         fitErrorsHe[layerBarName][energy] = errorHe;
+        if (layerBarName == "LayerX_bar9") {
+            cout << "meanP: " << meanP << " errorP: " << errorP << endl;
+            cout << "meanHe: " << meanHe << " errorHe: " << errorHe << endl;
+        }
     }
 
     // Close the input file
@@ -131,6 +135,8 @@ void PlotFitResultsCombined(
                 }
             }
 
+            graphProtons->SetPoint(indexP+1, 0., 0.);
+
             // Add helium points
             for (int energy : energies) {
                 if (fitMeansHe.count(layerBarName) && fitMeansHe.at(layerBarName).count(energy)) {
@@ -169,6 +175,8 @@ void PlotFitResultsCombined(
             multiGraph->SetTitle(Form("%s - Fit Results", layerBarName.Data()));
             multiGraph->GetXaxis()->SetTitle("Energy loss MC [MeV]");
             multiGraph->GetYaxis()->SetTitle("Mean Charge [a.u.]");
+            multiGraph->SetMinimum(0.);
+            //multiGraph->GetXaxis()->SetRangeUser(0., 15.);
             multiGraph->Draw("A");
 
             // Combine data for fitting
@@ -190,9 +198,33 @@ void PlotFitResultsCombined(
             double fit_min = 1.4267;
             double fit_max = 9.7638;
 
-            //TF1* combinedFit = new TF1("combinedFit", "[0]*x", 0., fit_max);
-            TF1* combinedFit = new TF1("combinedFit", "[0]*x/(1 + [1]*x + [2]*x**2)", fit_min, fit_max);
-            combinedGraph->Fit(combinedFit);
+            double minX = std::numeric_limits<double>::max();
+            double maxX = std::numeric_limits<double>::lowest();
+            double minY = std::numeric_limits<double>::max();
+            double maxY = std::numeric_limits<double>::lowest();
+
+            // Loop through all points in the graph to find the true min/max
+            for (int i = 0; i < combinedGraph->GetN(); ++i) {
+                double x, y;
+                combinedGraph->GetPoint(i, x, y);
+
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+            }
+
+            // Calculate the initial slope for the fit
+            //double initialSlope = (maxY - minY) / (maxX - minX);
+            double initialSlope = maxY / maxX;
+
+            TF1* combinedFit = new TF1("combinedFit", "[0]*x", fit_min, fit_max);
+            //TF1* combinedFit = new TF1("combinedFit", "[0]*x - [0]*[1]*x**2 + [0]*[1]**2*x**3", fit_min, 2.721);
+            combinedFit->SetParameters(initialSlope);  // Linear
+            //combinedFit->SetParameters(0.6, -0.09, 0.01);
+            //combinedFit->SetParameters(5., 1., 0.6, -2.);  // Birks + linear
+            //combinedFit->SetParameters(0.6, -0.5, 0.03);  // MacLaurin Modified Birks
+            combinedGraph->Fit(combinedFit, "WM");
             combinedFit->SetLineColor(kRed);
 
             // Draw the fit function
@@ -203,12 +235,14 @@ void PlotFitResultsCombined(
             legend->AddEntry(graphProtons, "Protons", "p");
             legend->AddEntry(graphHeliums, "Heliums", "p");
             auto [p0, p0Error] = RoundMeasurement(combinedFit->GetParameter(0), combinedFit->GetParError(0));
-            auto [p1, p1Error] = RoundMeasurement(combinedFit->GetParameter(1), combinedFit->GetParError(1));
-            auto [p2, p2Error] = RoundMeasurement(combinedFit->GetParameter(2), combinedFit->GetParError(2));
+            //auto [p1, p1Error] = RoundMeasurement(combinedFit->GetParameter(1), combinedFit->GetParError(1));
+            //auto [p2, p2Error] = RoundMeasurement(combinedFit->GetParameter(2), combinedFit->GetParError(2));
+            //auto [p3, p3Error] = RoundMeasurement(combinedFit->GetParameter(3), combinedFit->GetParError(3));
             
             legend->AddEntry((TObject*)0, Form("p_{0} = %s#pm%s", p0.c_str(), p0Error.c_str()), "");
-            legend->AddEntry((TObject*)0, Form("p_{1} = %s#pm%s", p1.c_str(), p1Error.c_str()), "");
-            legend->AddEntry((TObject*)0, Form("p_{2} = %s#pm%s", p2.c_str(), p2Error.c_str()), "");
+            //legend->AddEntry((TObject*)0, Form("p_{1} = %s#pm%s", p1.c_str(), p1Error.c_str()), "");
+            //legend->AddEntry((TObject*)0, Form("p_{2} = %s#pm%s", p2.c_str(), p2Error.c_str()), "");
+            //legend->AddEntry((TObject*)0, Form("p_{3} = %s#pm%s", p3.c_str(), p3Error.c_str()), "");
             legend->SetTextSize(0.02);
             legend->Draw();
 
