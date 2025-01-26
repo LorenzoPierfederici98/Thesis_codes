@@ -1,18 +1,23 @@
 // Macro that plots the fit results on protons and helium peaks given by the AnalyzeTWFragm.cc macro vs the energies
 // retrieved from MC (2 energy loss values per bar and beam energy). The fit charge values vs energy loss values
-// are fitted with a 1 parameter linear function. To be run with root -l -b -q 'CalibrateFragm.cc()'
+// are fitted with a 1 parameter linear function; these parameters (on per bar) are written in the configuration file.
+// To be run with root -l -b -q 'CalibrateFragm.cc()'
 
 #include "CalibrateFragm.h"
 
 void CalibrateFragm() {
-    std::vector<std::pair<std::string, double>> filesAndEnergies = {
+    std::vector<std::pair<std::string, int>> filesAndEnergies = {
         {"TW/AnaFOOT_TW_Decoded_HIT2022_fragm_100MeV_Fit.root", 100},
         {"TW/AnaFOOT_TW_Decoded_HIT2022_fragm_140MeV_Fit.root", 140},
         {"TW/AnaFOOT_TW_Decoded_HIT2022_fragm_200MeV_Fit.root", 200},
         {"TW/AnaFOOT_TW_Decoded_HIT2022_fragm_220MeV_Fit.root", 220}
     };
-    std::map<int, double>elossP = {{100, 2.721}, {140, 2.020}, {200, 1.4761}, {220, 1.4267}};  // energy loss for protons, from MC
-    std::map<int, double>elossHe = {{100, 9.7638}, {140, 7.2929}, {200, 5.4135}, {220, 5.2352}};  // energy loss for heliums, from MC
+    // Smeared MC values
+    // std::map<int, double>elossP = {{100, 2.721}, {140, 2.020}, {200, 1.4761}, {220, 1.4267}};  // energy loss for protons, from MC
+    // std::map<int, double>elossHe = {{100, 9.7638}, {140, 7.2929}, {200, 5.4135}, {220, 5.2352}};  // energy loss for heliums, from MC
+
+    std::map<int, double>elossP = {{100, 2.621}, {140, 1.901}, {200, 1.410}, {220, 1.325}};  // energy loss for protons, from MC
+    std::map<int, double>elossHe = {{100, 9.7371}, {140, 7.2586}, {200, 5.5314}, {220, 5.1694}};  // energy loss for heliums, from MC
 
     std::map<TString, std::map<int, double>> fitMeansP;  // protons
     std::map<TString, std::map<int, double>> fitErrorsP;
@@ -23,7 +28,8 @@ void CalibrateFragm() {
         ProcessFile(fileName, energy, fitMeansP, fitMeansHe, fitErrorsP, fitErrorsHe);
     }
 
-    PlotFitResultsCombined(fitMeansP, fitErrorsP, fitMeansHe, fitErrorsHe, elossP, elossHe);
+    std::map<TString, double> fitValues = PlotFitResultsCombined(fitMeansP, fitErrorsP, fitMeansHe, fitErrorsHe, elossP, elossHe);
+    WriteFitValuesOrdered(fitValues);
 }
 
 void ProcessFile(const TString& fileName, 
@@ -101,7 +107,7 @@ void ProcessFile(const TString& fileName,
     delete inputFile;
 }
 
-void PlotFitResultsCombined(
+std::map<TString, double> PlotFitResultsCombined(
     const std::map<TString, std::map<int, double>>& fitMeansP,
     const std::map<TString, std::map<int, double>>& fitErrorsP,
     const std::map<TString, std::map<int, double>>& fitMeansHe,
@@ -112,6 +118,9 @@ void PlotFitResultsCombined(
     // Define the energies and layers
     std::vector<int> energies = {100, 140, 200, 220};
     std::vector<TString> layers = {"X", "Y"};
+
+    // Stores the p0 fit values, to write them on an output file
+    std::map<TString, double> fitValues;
 
     for (TString layer : layers) {
         for (int bar = 0; bar < 20; ++bar) {
@@ -144,11 +153,6 @@ void PlotFitResultsCombined(
                     double errorHe = fitErrorsHe.at(layerBarName).at(energy);
                     graphHeliums->SetPoint(indexHe, elossHe.at(energy), meanHe);
                     graphHeliums->SetPointError(indexHe, 0, errorHe);
-                    if (layerBarName == "LayerX_bar1" && energy == 220) {
-                        // Setting the fit point for LayerX_bar9 @220 MeV/u as an outlier.
-                        // Points with 0 error are ignored in the fit.
-                        graphHeliums->SetPointError(indexHe, 0, 0); 
-                    }
                     ++indexHe;
                 }
             }
@@ -172,7 +176,7 @@ void PlotFitResultsCombined(
                                       Form("Fit Results - %s", layerBarName.Data()), 
                                       800, 600);
 
-            multiGraph->SetTitle(Form("%s - Fit Results", layerBarName.Data()));
+            multiGraph->SetTitle(Form("%s - Fit Results true MC", layerBarName.Data()));
             multiGraph->GetXaxis()->SetTitle("Energy loss MC [MeV]");
             multiGraph->GetYaxis()->SetTitle("Mean Charge [a.u.]");
             multiGraph->SetMinimum(0.);
@@ -195,22 +199,19 @@ void PlotFitResultsCombined(
             }
 
             // Perform the combined fit
-            double fit_min = 1.4267;
-            double fit_max = 9.7638;
+            //double fit_min = elossP.at(220);  // elossP[220] cannot be used on const, since it allows insertion if the key doesn't exist
+            double fit_min = 0.;
+            double fit_max = elossHe.at(100);
 
-            double minX = std::numeric_limits<double>::max();
             double maxX = std::numeric_limits<double>::lowest();
-            double minY = std::numeric_limits<double>::max();
             double maxY = std::numeric_limits<double>::lowest();
 
-            // Loop through all points in the graph to find the true min/max
+            // Loop through all points in the graph to find the true max
             for (int i = 0; i < combinedGraph->GetN(); ++i) {
                 double x, y;
                 combinedGraph->GetPoint(i, x, y);
 
-                if (x < minX) minX = x;
                 if (x > maxX) maxX = x;
-                if (y < minY) minY = y;
                 if (y > maxY) maxY = y;
             }
 
@@ -224,7 +225,7 @@ void PlotFitResultsCombined(
             //combinedFit->SetParameters(0.6, -0.09, 0.01);
             //combinedFit->SetParameters(5., 1., 0.6, -2.);  // Birks + linear
             //combinedFit->SetParameters(0.6, -0.5, 0.03);  // MacLaurin Modified Birks
-            combinedGraph->Fit(combinedFit, "WM");
+            combinedGraph->Fit(combinedFit, "R");
             combinedFit->SetLineColor(kRed);
 
             // Draw the fit function
@@ -238,12 +239,13 @@ void PlotFitResultsCombined(
             //auto [p1, p1Error] = RoundMeasurement(combinedFit->GetParameter(1), combinedFit->GetParError(1));
             //auto [p2, p2Error] = RoundMeasurement(combinedFit->GetParameter(2), combinedFit->GetParError(2));
             //auto [p3, p3Error] = RoundMeasurement(combinedFit->GetParameter(3), combinedFit->GetParError(3));
+            fitValues[layerBarName] = combinedFit->GetParameter(0);
             
-            legend->AddEntry((TObject*)0, Form("p_{0} = %s#pm%s", p0.c_str(), p0Error.c_str()), "");
+            legend->AddEntry((TObject*)0, Form("p_{0} [a.u./MeV] = %s#pm%s", p0.c_str(), p0Error.c_str()), "");
             //legend->AddEntry((TObject*)0, Form("p_{1} = %s#pm%s", p1.c_str(), p1Error.c_str()), "");
             //legend->AddEntry((TObject*)0, Form("p_{2} = %s#pm%s", p2.c_str(), p2Error.c_str()), "");
             //legend->AddEntry((TObject*)0, Form("p_{3} = %s#pm%s", p3.c_str(), p3Error.c_str()), "");
-            legend->SetTextSize(0.02);
+            legend->SetTextSize(0.025);
             legend->Draw();
 
             c->SaveAs(Form("Plots/Fragmentation_%s.png", layerBarName.Data()));
@@ -257,9 +259,75 @@ void PlotFitResultsCombined(
             delete c;
         }
     }
+    return fitValues;
 }
 
+void WriteFitValuesOrdered(const std::map<TString, double>& fitValues) {
+    // Define the output file name inside the function
+    const std::string outputFileName = "TATW_Energy_calibration_perBar_HIT2022.cal";
 
+    // Create a vector of pairs to allow sorting
+    std::vector<std::tuple<int, TString, double>> sortedValues;
+
+    // Parse the bar ID and store it along with the fit values
+    for (const auto& entry : fitValues) {
+        const TString& layerBarName = entry.first;
+        double p0 = entry.second;
+
+        // Extract the bar ID from the name (e.g., "LayerX_bar0" or "LayerY_bar1")
+        int barID = -1;
+        bool isLayerX = false;
+        if (sscanf(layerBarName.Data(), "LayerX_bar%d", &barID) == 1) {
+            isLayerX = true;
+        } else if (sscanf(layerBarName.Data(), "LayerY_bar%d", &barID) != 1) {
+            std::cerr << "Error parsing bar ID from layerBarName: " << layerBarName.Data() << std::endl;
+            continue;
+        }
+
+        // Calculate the combined bar ID: 0–19 for Layer Y, 20–39 for Layer X
+        int combinedBarID = barID + (isLayerX ? 20 : 0);
+
+        // Add to the sortedValues vector
+        sortedValues.emplace_back(combinedBarID, layerBarName, p0);
+    }
+
+    // Sort by the combined bar ID
+    // The lambda function is used to compare the first element of the tuple (get<0> a and get<0> b) 
+    std::sort(sortedValues.begin(), sortedValues.end(),
+              [](const auto& a, const auto& b) { return std::get<0>(a) < std::get<0>(b); });
+
+    // Open the output file
+    std::ofstream outFile(outputFileName);
+    if (!outFile.is_open()) {
+        std::cerr << "Error: Unable to open file " << outputFileName << std::endl;
+        return;
+    }
+
+    // Write header
+    outFile << "#BarId(Pisa)          p0          p1 layer(SHOE)" << std::endl;
+    outFile << "#-+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+-+-+-+-+-+-+-+-+-+-\n";
+
+    // Write data
+    for (const auto& entry : sortedValues) {
+        int combinedBarID = std::get<0>(entry);  // Combined bar ID
+        const TString& layerBarName = std::get<1>(entry);
+        double p0 = std::get<2>(entry);
+
+        // Determine the layer (0 for Y, 1 for X)
+        int layerShoe = layerBarName.Contains("LayerX") ? 1 : 0;
+
+        // Write output (p1 is always 0)
+        outFile << std::setw(10) << combinedBarID
+                << std::setw(20) << p0
+                << std::setw(12) << 0.0
+                << std::setw(10) << layerShoe
+                << std::endl;
+    }
+
+    outFile << "#-+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+-+-+-+-+-+-+-+-+-+-\n";
+    outFile.close();
+    std::cout << "Fit values written to file: " << outputFileName << std::endl;
+}
 
 pair<std::string, std::string> RoundMeasurement(double value, double uncertainty) {
     // Determine the order of magnitude of the uncertainty

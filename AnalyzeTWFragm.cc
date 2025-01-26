@@ -1,7 +1,10 @@
 // Macro that fits the charge distribution from the AnalyzeTWChargeTime.cc merged output files (for fragmentation runs).
 // A fit is performed with 2 separate gaussians, one for proton and one for helium peaks. The fit limits for the proton
 // peaks depend on the beam energy. Only the histograms whose entries are greater than a fraction of the sum of the merged files
-// total event number are fitted. The fit results are stored in files name like e.g.
+// total event number are fitted (the entries of each file part of the merged output are saved in it and summed).
+// The histogram peaks are automatically found with TSPectrum in a certain range (energy-dependent, the bins outside the range
+// are set to 0 and the peaks are searched for inbetween); the fits are then performed within a certain bin-range centered around
+// the peak, depending on the specific bar and beam energy. The fit results are stored in files name like e.g.
 // TW/AnaFOOT_TW_Decoded_HIT2022_140MeV_Fit.root. To be run with root -l -b -q 'AnalyzeTWFragm.cc()'.
 
 #include "AnalyzeTWFragm.h"
@@ -13,9 +16,6 @@ void AnalyzeTWFragm() {
         {"TW/AnaFOOT_TW_Decoded_HIT2022_fragm_200MeV.root", 200},
         {"TW/AnaFOOT_TW_Decoded_HIT2022_fragm_220MeV.root", 220}
     };
-
-    std::map<int, double>elossP = {{100, 2.721}, {140, 2.2020}, {200, 1.4761}, {220, 1.4267}};  // energy loss for protons, from MC
-    std::map<int, double>elossHe = {{100, 9.7638}, {140, 7.2929}, {200, 5.4135}, {220, 5.2352}};  // energy loss for heliums, from MC
 
     std::map<TString, std::map<int, double>> fitMeansP;  // protons
     std::map<TString, std::map<int, double>> fitErrorsP;
@@ -100,7 +100,7 @@ void FitHistogramsInDirectory(
             }
             cout << endl;
             cout << "beam energy: " << energy << " MeV/u " << layerBarCombination << endl;
-            std::pair<TFitResultPtr, TFitResultPtr> fitResults = FitPeaksWithTSpectrum(hist, energy, thresh_peak_low, thresh_peak_high);
+            std::pair<TFitResultPtr, TFitResultPtr> fitResults = FitPeaksWithTSpectrum(hist, energy, thresh_peak_low, thresh_peak_high, layerBarCombination);
             TFitResultPtr fitResult1 = fitResults.first, fitResult2 = fitResults.second;
 
             if (fitResult1.Get() != nullptr){
@@ -195,7 +195,17 @@ pair<std::string, std::string> RoundMeasurement(double value, double uncertainty
 }
 
 
-std::pair<TFitResultPtr, TFitResultPtr> FitPeaksWithTSpectrum(TH1D *hist, double energy, double thresh_peak_low, double thresh_peak_high) {
+std::pair<TFitResultPtr, TFitResultPtr> FitPeaksWithTSpectrum(TH1D *hist, double energy, double thresh_peak_low, double thresh_peak_high, const TString& layerBarCombination) {
+
+    int layerStart = layerBarCombination.Index("Layer") + 5; // "Layer" is 5 characters long
+    int barStart = layerBarCombination.Index("_bar") + 4;    // "_bar" is 4 characters long
+
+    // Extract the layer (e.g., 'X' or 'Y')
+    TString layer = layerBarCombination(layerStart, 1); // Extract one character at layerStart
+
+    // Extract the bar number as a string and convert to integer
+    TString barString = layerBarCombination(barStart, layerBarCombination.Length() - barStart);
+    int barNumber = barString.Atoi();
 
     int nPeaks = 0;
 
@@ -237,8 +247,29 @@ std::pair<TFitResultPtr, TFitResultPtr> FitPeaksWithTSpectrum(TH1D *hist, double
         }
         cout << "first peak found at x=" << x1 << endl;
         int binMax1 = hist->FindBin(x1);
-        int binLow1 = std::max(1, binMax1 - 4);
-        int binHigh1 = std::min(hist->GetNbinsX(), binMax1 + 4);
+        // 2 if energy > 200, 3 otherwise
+        int bins_fit_p = (energy >= 200) ? 2 : 3;
+        if (energy == 100) {
+            if (layerBarCombination == "LayerY_bar19" || (layer == "X" && (barNumber == 0 || barNumber == 1))) {
+                bins_fit_p = 4;
+            }
+            else if (layer == "Y" && barNumber > 16) {
+                bins_fit_p = 4;
+                if (barNumber == 19) {
+                    bins_fit_p = 6;
+                }
+            }
+        }
+        else if (energy == 200) {
+            if (layer == "X" && (barNumber < 2)) {
+                bins_fit_p = 4;
+            }
+            else if (layer == "Y" && (barNumber == 1)) {
+                bins_fit_p = 4;
+            }
+        }
+        int binLow1 = std::max(1, binMax1 - bins_fit_p);
+        int binHigh1 = std::min(hist->GetNbinsX(), binMax1 + bins_fit_p);
         TF1* gaus1 = new TF1("gaus1", "gaus", hist->GetBinLowEdge(binLow1), hist->GetBinLowEdge(binHigh1 + 1));
         gaus1->SetParameter(1, x1);
         gaus1->SetParLimits(1, x1 - 0.1, x1 + 0.1);
@@ -258,13 +289,96 @@ std::pair<TFitResultPtr, TFitResultPtr> FitPeaksWithTSpectrum(TH1D *hist, double
         double x2 = sortedPeaks[1];
         if (x2 - sortedPeaks[0] < 2.5)
             x2 = sortedPeaks[0]*4;
-        if (x2 < 4.84 && energy == 100) {  // fix LayerX_bar1 at 100 MeV/u
-            x2 = 12.5884;
+        if (energy == 100) {  // fix LayerX_bar1 at 100 MeV/u
+            if (layerBarCombination == "LayerX_bar1") {
+                x2 = 12.5884;
+            }
+            else if (layerBarCombination == "LayerY_bar19") {
+                x2 = 10.9;
+            } 
+            else if (layerBarCombination == "LayerX_bar19") {
+                x2 = 10.;
+            }
+        }
+        else if (energy == 140 && layerBarCombination == "LayerY_bar19") {
+            x2 = 8.89;
+        }
+        else if (energy == 220) {
+            if (layerBarCombination == "LayerX_bar1") {
+                x2 = 7.8;
+            }
+            else if (layerBarCombination == "LayerX_bar0") {
+                x2 = 5.9;
+            }
+            else if (layerBarCombination == "LayerY_bar0") {
+                x2 = 6.;
+            }
         }
         cout << "second peak found at x=" << x2 << endl;
         int binMax2 = hist->FindBin(x2);
-        int binLow2 = std::max(1, binMax2 - 6);
-        int binHigh2 = std::min(hist->GetNbinsX(), binMax2 + 6);
+        int bins_fit_he = 4;
+        if (energy == 100 && (barNumber < 5 || barNumber > 15)){
+            bins_fit_he = 6;
+            if (barNumber == 1) {
+                bins_fit_he = 7;
+            }
+            else if (barNumber == 2 || (layer == "Y" && barNumber == 4)) {
+                bins_fit_he = 4;
+            }
+            else if (layer == "Y" && barNumber == 17) {
+                bins_fit_he = 7;
+            }
+            else if (barNumber == 19) {
+                bins_fit_he = 8;
+            }
+
+        }
+        else if (energy == 140){
+            if (layer == "X" && (barNumber == 1 || barNumber == 4 || barNumber > 17)){
+                bins_fit_he = 6;
+            }
+            else if (layer == "Y" && (barNumber == 0 || barNumber > 14)){
+                bins_fit_he = 6;
+            }
+        }
+        else if (energy == 200) {
+            if (barNumber < 2) {
+                bins_fit_he = 6;
+            }
+            else if (layer == "X" && barNumber == 4) {
+                bins_fit_he = 5;
+            }
+            else if (layer == "X" && (barNumber > 16 && barNumber != 18)) {
+                bins_fit_he = 6;   
+            }
+            else if (layer == "Y" && barNumber > 15) {
+                bins_fit_he = 6;
+            }
+        }
+        else if (energy == 220) {
+            if (layer == "X") {
+                if (barNumber == 3 || barNumber == 4) {
+                    bins_fit_he = 6;
+                }
+                else if (barNumber == 0 || barNumber == 1) {
+                    bins_fit_he = 8;
+                }
+            }
+            else if (layer == "Y") {
+                if (barNumber == 2 || barNumber == 1 || barNumber > 14) {
+                    bins_fit_he = 6;
+                }
+                else if (barNumber == 0) {
+                    bins_fit_he = 8;
+                }
+                else if (barNumber == 6 || barNumber == 7) {
+                    bins_fit_he = 3;
+                }
+            }
+        }
+
+        int binLow2 = std::max(1, binMax2 - bins_fit_he);
+        int binHigh2 = std::min(hist->GetNbinsX(), binMax2 + bins_fit_he);
         TF1* gaus2 = new TF1("gaus2", "gaus", hist->GetBinLowEdge(binLow2), hist->GetBinLowEdge(binHigh2 + 1));
         gaus2->SetParameter(1, x2);
         gaus2->SetParLimits(1, x2 - 0.1, x2 + 0.1);

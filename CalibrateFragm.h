@@ -20,12 +20,14 @@ void ProcessFile(const TString& fileName,
                  std::map<TString, std::map<int, double>>& fitErrorsP, 
                  std::map<TString, std::map<int, double>>& fitErrorsHe);
 
-void PlotFitResultsCombined(
+std::map<TString, double> PlotFitResultsCombined(
     const std::map<TString, std::map<int, double>>& fitMeansP,
     const std::map<TString, std::map<int, double>>& fitErrorsP,
     const std::map<TString, std::map<int, double>>& fitMeansHe,
     const std::map<TString, std::map<int, double>>& fitErrorsHe,
     const std::map<int, double>& elossP,
     const std::map<int, double>& elossHe);
+
+void WriteFitValuesOrdered(const std::map<TString, double>& fitValues);
 
 pair<std::string, std::string> RoundMeasurement(double value, double uncertainty);

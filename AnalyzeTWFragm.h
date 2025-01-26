@@ -27,7 +27,7 @@ void FitHistogramsInDirectory(
     TFile* outputFile
 );
 
-std::pair<TFitResultPtr, TFitResultPtr> FitPeaksWithTSpectrum(TH1D *hist, double energy, double thresh_peak_low, double thresh_peak_high);
+std::pair<TFitResultPtr, TFitResultPtr> FitPeaksWithTSpectrum(TH1D *hist, double energy, double thresh_peak_low, double thresh_peak_high, const TString& layerBarCombination);
 
 void ProcessFile(
     const std::string& fileName, 
