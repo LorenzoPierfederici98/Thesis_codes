@@ -37,5 +37,3 @@ void ProcessFile(
     std::map<TString, std::map<int, double>>& fitErrorsP,
     std::map<TString, std::map<int, double>>& fitErrorsHe
 );
-
-pair<std::string, std::string> RoundMeasurement(double value, double uncertainty);

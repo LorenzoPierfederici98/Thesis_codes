@@ -172,29 +172,6 @@ void ProcessFile(
     delete file;
 }
 
-pair<std::string, std::string> RoundMeasurement(double value, double uncertainty) {
-    // Determine the order of magnitude of the uncertainty
-    int uncertaintyOrder = (int)std::floor(std::log10(uncertainty));
-    double roundingFactor = std::pow(10, uncertaintyOrder);
-
-    // Round uncertainty to 1 significant figure
-    double roundedUncertainty = std::round(uncertainty / roundingFactor) * roundingFactor;
-
-    // Adjust the value to match the precision of the uncertainty
-    double roundedValue = std::round(value / roundingFactor) * roundingFactor;
-
-    // Determine the number of decimal places to display based on the rounded uncertainty
-    int decimalPlaces = std::max(0, -uncertaintyOrder);
-
-    // Format value and uncertainty into strings with the required precision
-    std::ostringstream valueStream, uncertaintyStream;
-    valueStream << std::fixed << std::setprecision(decimalPlaces) << roundedValue;
-    uncertaintyStream << std::fixed << std::setprecision(decimalPlaces) << roundedUncertainty;
-
-    return {valueStream.str(), uncertaintyStream.str()};
-}
-
-
 std::pair<TFitResultPtr, TFitResultPtr> FitPeaksWithTSpectrum(TH1D *hist, double energy, double thresh_peak_low, double thresh_peak_high, const TString& layerBarCombination) {
 
     int layerStart = layerBarCombination.Index("Layer") + 5; // "Layer" is 5 characters long

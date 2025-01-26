@@ -23,6 +23,4 @@ void ProcessFile(
     std::map<int, double>& fitErrorHe
 );
 
-pair<std::string, std::string> RoundMeasurement(double value, double uncertainty);
-
 std::pair<TFitResultPtr, TFitResultPtr> FitPeaksWithTSpectrum(TH1D *hist, int energy);
