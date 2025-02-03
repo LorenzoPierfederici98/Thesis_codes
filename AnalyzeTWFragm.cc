@@ -77,7 +77,7 @@ void FitHistogramsInDirectory(
 
         // Extract layer and bar identifiers
         TString layerBarCombination = histName(7, histName.Length() - 7);  // e.g. LayerY_bar9
-        outputFile->cd();
+        //outputFile->cd();
         hist->Draw();
         // Fit histogram if above the threshold
         if (hist->GetEntries() > threshold) {
@@ -110,7 +110,7 @@ void FitHistogramsInDirectory(
                 if (meanChargeP > 0 || stdChargeP / meanChargeP < 0.2 || meanChargeP / meanChargeErrP - 1 > 0.5) {
                     fitMeansHe[layerBarCombination][energy] = meanChargeP;
                     fitErrorsHe[layerBarCombination][energy] = meanChargeErrP;
-                    fitResult1->Write(Form("FitResultP_%s", layerBarCombination.Data()));
+                    fitResult1->Write(Form("FitResultP_%s", layerBarCombination.Data()), TObject::kOverwrite);
                 }
             }
 
@@ -121,12 +121,12 @@ void FitHistogramsInDirectory(
                 if (meanChargeHe > 0 || stdChargeHe / meanChargeHe < 0.2 || meanChargeHe / meanChargeErrHe - 1 > 0.5) {
                     fitMeansP[layerBarCombination][energy] = meanChargeHe;
                     fitErrorsP[layerBarCombination][energy] = meanChargeErrHe;
-                    fitResult2->Write(Form("FitResultHe_%s", layerBarCombination.Data()));
+                    fitResult2->Write(Form("FitResultHe_%s", layerBarCombination.Data()), TObject::kOverwrite);
                 }
             }
 
             // Save the histogram with both fits to the output file
-            hist->Write();
+            hist->Write("", TObject::kOverwrite);
         }
 
         delete hist;
@@ -154,7 +154,13 @@ void ProcessFile(
 
     // Create an output ROOT file to store fitted histograms
     TString outputFileName = TString(fileName).ReplaceAll(".root", "_Fit.root");
-    TFile* outputFile = TFile::Open(outputFileName, "RECREATE");
+    TFile* outputFile = TFile::Open(outputFileName, "UPDATE");
+
+    TDirectory* fitDir = outputFile->GetDirectory("ChargeFit");
+    if (!fitDir) {
+        fitDir = outputFile->mkdir("ChargeFit");  // Create only if it doesn't exist
+    }
+    fitDir->cd();  // Move into the directory before writing
 
     const std::vector<std::string> directories = {"ChargeTimeLayerX", "ChargeTimeLayerY"};
     for (const auto& dirName : directories) {
@@ -265,8 +271,8 @@ std::pair<TFitResultPtr, TFitResultPtr> FitPeaksWithTSpectrum(TH1D *hist, double
     if (nPeaks == 2) {
         double x2 = sortedPeaks[1];
         if (x2 - sortedPeaks[0] < 2.5)
-            x2 = sortedPeaks[0]*4;
-        if (energy == 100) {  // fix LayerX_bar1 at 100 MeV/u
+            x2 = sortedPeaks[0] * 4;
+        if (energy == 100) {
             if (layerBarCombination == "LayerX_bar1") {
                 x2 = 12.5884;
             }
