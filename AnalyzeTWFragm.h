@@ -2,15 +2,14 @@
  * @file AnalyzeTWFragm.h
  * @brief Header file for AnalyzeTWFragm.cc
  * 
- * This file contains function declarations for fitting the charge distribution from the AnalyzeTWChargeTime.cc merged output files
- * (for  fragmentation runs).
- * A fit is performed with 2 separate gaussians, one for proton and one for helium peaks. The fit limits for the proton
- * peaks depend on the beam energy. Only the histograms whose entries are greater than a fraction of the sum of the merged files
- * total event number are fitted (the entries of each file part of the merged output are saved in it and summed).
- * The histogram peaks are automatically found with TSPectrum in a certain range (energy-dependent, the bins outside the range
- * are set to 0 and the peaks are searched for inbetween); the fits are then performed within a certain bin-range centered around
+ * This file contains function declarations for fitting charge distributions from the AnalyzeTWChargeTime.cc merged output files
+ * (for  fragmentation runs). A fit is performed with 2 separate gaussians, one for proton and one for helium peaks. The fit limits
+ * for the proton peaks depend on the beam energy. Only the histograms whose entries are greater than a fraction of the sum of the
+ * merged files total event number are fitted (the entries of each file part of the merged output are saved in it and summed).
+ * The histogram peaks are automatically found with TSPectrum; the fits are then performed within a certain bin-range centered around
  * the peak, depending on the specific bar and beam energy. The fit results are stored in files named like e.g.
- * TW/AnaFOOT_TW_Decoded_HIT2022_140MeV_Fit.root. To be run with root -l -b -q 'AnalyzeTWFragm.cc()'.
+ * AnaFOOT_TW_Decoded_HIT2022_140MeV_Fit.root (created if they don't already exist, or overwritten if they do),
+ * inside of the ChargeFit directory. To be run with root -l -b -q 'AnalyzeTWFragm.cc()'.
  */
 
 #if !defined(__CINT__) || defined(__MAKECINT__)
@@ -45,7 +44,7 @@ int SumNentries(TFile* file);
  * 
  * This function fits the histograms in the specified directory using two separate
  * Gaussian functions, one for proton peaks and one for helium peaks. The fit limits
- * depend on the beam energy. Only histograms with entries greater than a specified
+ * depend on the bar and beam energy. Only histograms with entries greater than a specified
  * threshold are fitted. The fit results are stored in the provided maps.
  * 
  * @param dir Pointer to the directory containing the histograms.
@@ -99,15 +98,11 @@ void ProcessFile(
  * 
  * @param hist Pointer to the histogram.
  * @param energy Beam energy.
- * @param thresh_peak_low Lower threshold for peak search.
- * @param thresh_peak_high Upper threshold for peak search.
  * @param layerBarCombination String representing the layer and bar combination.
  * @return Pair of fit results for the proton and helium peaks.
  */
 std::pair<TFitResultPtr, TFitResultPtr> FitPeaksWithTSpectrum(
     TH1D *hist, 
-    double energy, 
-    double thresh_peak_low, 
-    double thresh_peak_high, 
+    double energy,  
     const TString& layerBarCombination
 );

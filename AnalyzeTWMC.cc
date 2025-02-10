@@ -1,8 +1,8 @@
-// Macro that fits the charge distribution from the AnalyzeTWChargeTime.cc merged output files (for MC runs).
+// Macro that fits the charge distribution from the AnalyzeTWFragMC.cc output files (for MC runs).
 // A fit is performed with 2 separate gaussians, one for proton and one for helium peaks. The peaks are automatically
-// found with TSPectrum in a certain range (between 1. and 12., the bins outside the range are set to 0); the peaks are
-// then fitted within a certain bin-range centered around the peak. The fit results are stored in files name like e.g.
-// TW/AnaFOOT_TW_DecodedMC_HIT2022_MC_140_Fit.root. To be run with root -l -b -q 'AnalyzeTWMC.cc()'.
+// found with TSPectrum and then fitted within a certain bin-range centered around the peak. The fit results
+// are stored in files name like e.g. AnaFOOT_TW_DecodedMC_HIT2022_MC_140_Fit.root (created if they don't already exist,
+// or overwritten if they do). To be run with root -l -b -q 'AnalyzeTWMC.cc()'.
 
 #include "AnalyzeTWMC.h"
 
@@ -41,7 +41,7 @@ void ProcessFile(
     }
     // Create an output ROOT file to store fitted histograms
     TString outputFileName = TString(fileName).ReplaceAll(".root", "_Fit.root");
-    TFile* outputFile = TFile::Open(outputFileName, "RECREATE");
+    TFile* outputFile = TFile::Open(outputFileName, "UPDATE");
     std::cout << "Processing file: " << fileName << std::endl;
     
     TH1D* hist = dynamic_cast<TH1D*>(file->Get("Eloss_true_ch"));
@@ -66,7 +66,7 @@ void ProcessFile(
         if (meanChargeP > 0 || stdChargeP / meanChargeP < 0.2 || meanChargeP / meanChargeErrP - 1 > 0.5) {
             fitMeanHe[energy] = meanChargeP;
             fitErrorHe[energy] = meanChargeErrP;
-            fitResult1->Write(Form("FitResultP_MC_%dMeV", energy));
+            fitResult1->Write(Form("FitResultP_MC_%dMeV", energy), TObject::kOverwrite);
         }
     }
 
@@ -77,11 +77,11 @@ void ProcessFile(
         if (meanChargeHe > 0 || stdChargeHe / meanChargeHe < 0.2 || meanChargeHe / meanChargeErrHe - 1 > 0.5) {
             fitMeanP[energy] = meanChargeHe;
             fitErrorP[energy] = meanChargeErrHe;
-            fitResult2->Write(Form("FitResultHe_MC_%dMeV", energy));
+            fitResult2->Write(Form("FitResultHe_MC_%dMeV", energy), TObject::kOverwrite);
         }
     }
     // Save the histogram with both fits to the output file
-    hist->Write();
+    hist->Write("", TObject::kOverwrite);
     outputFile->Close();
     file->Close();
     delete outputFile;
@@ -91,25 +91,9 @@ void ProcessFile(
 std::pair<TFitResultPtr, TFitResultPtr> FitPeaksWithTSpectrum(TH1D *hist, int energy) {
 
     int nPeaks = 0;
-    double thresh_peak_low = 1.;
-    double thresh_peak_high = 12.;
-
-    int binLow = hist->FindBin(thresh_peak_low); // Find the bin corresponding to x = low_thresh
-    int binHigh = hist->FindBin(thresh_peak_high);
-    int binMax = hist->GetNbinsX(); // Upper limit of the histogram
-
-    // Clone the histogram and set the desired range
-    TH1D* histRestricted = (TH1D*)hist->Clone("histRestricted");
-    for (int bin = 1; bin < binLow; ++bin) {
-        histRestricted->SetBinContent(bin, 0); // Zero out bins below x = thresh
-    }
-    for (int bin = binHigh; bin < binMax; ++bin) {
-        histRestricted->SetBinContent(bin, 0);
-    }
     // Use TSpectrum to search for peaks
     TSpectrum spectrum(2); // Max number of peaks to find
-    nPeaks = spectrum.Search(histRestricted, 2, "", 0.0015); // Use the restricted histogram
-    delete histRestricted;
+    nPeaks = spectrum.Search(hist, 2, "", 0.0015); // Use the restricted histogram
 
     cout << "# of peaks: " << nPeaks << endl;
     TFitResultPtr fitResult1, fitResult2;

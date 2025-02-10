@@ -2,19 +2,19 @@
 // A fit is performed with 2 separate gaussians, one for proton and one for helium peaks. The fit limits for the proton
 // peaks depend on the beam energy. Only the histograms whose entries are greater than a fraction of the sum of the merged files
 // total event number are fitted (the entries of each file part of the merged output are saved in it and summed).
-// The histogram peaks are automatically found with TSPectrum in a certain range (energy-dependent, the bins outside the range
-// are set to 0 and the peaks are searched for inbetween); the fits are then performed within a certain bin-range centered around
+// The histogram peaks are automatically found with TSPectrum; the fits are then performed within a certain bin-range centered around
 // the peak, depending on the specific bar and beam energy. The fit results are stored in files name like e.g.
-// TW/AnaFOOT_TW_Decoded_HIT2022_140MeV_Fit.root. To be run with root -l -b -q 'AnalyzeTWFragm.cc()'.
+// AnaFOOT_TW_Decoded_HIT2022_140MeV_Fit.root (created if they don't already exist, or overwritten if they do),
+// inside of the ChargeFit directory. To be run with root -l -b -q 'AnalyzeTWFragm.cc()'.
 
 #include "AnalyzeTWFragm.h"
 
 void AnalyzeTWFragm() {
     std::vector<std::pair<std::string, double>> filesAndEnergies = {
-        {"TW/AnaFOOT_TW_Decoded_HIT2022_fragm_100MeV.root", 100},
-        {"TW/AnaFOOT_TW_Decoded_HIT2022_fragm_140MeV.root", 140},
-        {"TW/AnaFOOT_TW_Decoded_HIT2022_fragm_200MeV.root", 200},
-        {"TW/AnaFOOT_TW_Decoded_HIT2022_fragm_220MeV.root", 220}
+        {"TW/cuts/AnaFOOT_TW_Decoded_HIT2022_fragm_100MeV.root", 100},
+        {"TW/cuts/AnaFOOT_TW_Decoded_HIT2022_fragm_140MeV.root", 140},
+        {"TW/cuts/AnaFOOT_TW_Decoded_HIT2022_fragm_200MeV.root", 200},
+        {"TW/cuts/AnaFOOT_TW_Decoded_HIT2022_fragm_220MeV.root", 220}
     };
 
     std::map<TString, std::map<int, double>> fitMeansP;  // protons
@@ -78,29 +78,14 @@ void FitHistogramsInDirectory(
         // Extract layer and bar identifiers
         TString layerBarCombination = histName(7, histName.Length() - 7);  // e.g. LayerY_bar9
         //outputFile->cd();
-        hist->Draw();
         // Fit histogram if above the threshold
         if (hist->GetEntries() > threshold) {
-            // the bins of the original histograms before thresh_peak_low beyond thresh_peak_high
-            // are set to 0 and 2 peaks are searched for inbetween
-            double thresh_peak_high;
-            double thresh_peak_low = 1.;
-            if (energy == 100) {
-                thresh_peak_high = 15.;
-            }
-            else if (energy == 140) {
-                thresh_peak_high = 12.;
-            }
-            else if (energy == 200) {
-                thresh_peak_high = 9.;              
-            }
-            else if (energy == 220) {
-                thresh_peak_high = 8.5;
-                thresh_peak_low = 0.85;
-            }
+            
             cout << endl;
             cout << "beam energy: " << energy << " MeV/u " << layerBarCombination << endl;
-            std::pair<TFitResultPtr, TFitResultPtr> fitResults = FitPeaksWithTSpectrum(hist, energy, thresh_peak_low, thresh_peak_high, layerBarCombination);
+            hist->Draw();
+
+            std::pair<TFitResultPtr, TFitResultPtr> fitResults = FitPeaksWithTSpectrum(hist, energy, layerBarCombination);
             TFitResultPtr fitResult1 = fitResults.first, fitResult2 = fitResults.second;
 
             if (fitResult1.Get() != nullptr){
@@ -178,7 +163,7 @@ void ProcessFile(
     delete file;
 }
 
-std::pair<TFitResultPtr, TFitResultPtr> FitPeaksWithTSpectrum(TH1D *hist, double energy, double thresh_peak_low, double thresh_peak_high, const TString& layerBarCombination) {
+std::pair<TFitResultPtr, TFitResultPtr> FitPeaksWithTSpectrum(TH1D *hist, double energy, const TString& layerBarCombination) {
 
     int layerStart = layerBarCombination.Index("Layer") + 5; // "Layer" is 5 characters long
     int barStart = layerBarCombination.Index("_bar") + 4;    // "_bar" is 4 characters long
@@ -191,23 +176,9 @@ std::pair<TFitResultPtr, TFitResultPtr> FitPeaksWithTSpectrum(TH1D *hist, double
     int barNumber = barString.Atoi();
 
     int nPeaks = 0;
-
-    int binLow = hist->FindBin(thresh_peak_low); // Find the bin corresponding to x = low_thresh
-    int binHigh = hist->FindBin(thresh_peak_high);
-    int binMax = hist->GetNbinsX(); // Upper limit of the histogram
-
-    // Clone the histogram and set the desired range
-    TH1D* histRestricted = (TH1D*)hist->Clone("histRestricted");
-    for (int bin = 1; bin < binLow; ++bin) {
-        histRestricted->SetBinContent(bin, 0); // Zero out bins below x = thresh
-    }
-    for (int bin = binHigh; bin < binMax; ++bin) {
-        histRestricted->SetBinContent(bin, 0);
-    }
     // Use TSpectrum to search for peaks
     TSpectrum spectrum(2); // Max number of peaks to find
-    nPeaks = spectrum.Search(histRestricted, 2, "", 0.0015); // Use the restricted histogram
-    delete histRestricted;
+    nPeaks = spectrum.Search(hist, 2, "", 0.0015); // Use the restricted histogram
 
     cout << "# of peaks: " << nPeaks << endl;
     TFitResultPtr fitResult1, fitResult2;
@@ -236,6 +207,9 @@ std::pair<TFitResultPtr, TFitResultPtr> FitPeaksWithTSpectrum(TH1D *hist, double
             if (layerBarCombination == "LayerY_bar19" || (layer == "X" && (barNumber == 0 || barNumber == 1))) {
                 bins_fit_p = 4;
             }
+            else if (layer == "X" && barNumber == 2) {
+                bins_fit_p = 4;
+            }
             else if (layer == "Y" && barNumber > 16) {
                 bins_fit_p = 4;
                 if (barNumber == 19) {
@@ -243,12 +217,40 @@ std::pair<TFitResultPtr, TFitResultPtr> FitPeaksWithTSpectrum(TH1D *hist, double
                 }
             }
         }
+        else if (energy == 140) {
+            if (layer == "X" && (barNumber == 7 || barNumber == 11 || barNumber == 15)) {
+                bins_fit_p = 2;
+            }
+            else if (layer == "Y" && barNumber == 10) {
+                bins_fit_p = 2;
+            }
+        }
         else if (energy == 200) {
             if (layer == "X" && (barNumber < 2)) {
                 bins_fit_p = 4;
             }
-            else if (layer == "Y" && (barNumber == 1)) {
-                bins_fit_p = 4;
+            else if (layer == "X" && (barNumber == 3 || barNumber == 4 || barNumber == 14)) {
+                bins_fit_p = 3;
+            }
+            else if (layer == "X" && barNumber > 16) {
+                bins_fit_p = 3;
+            }
+            else if (layer == "Y" && (barNumber == 1 || barNumber == 19)) {
+                bins_fit_p = 3;
+                if (barNumber == 19) {
+                    bins_fit_p = 4;
+                }
+            }
+        }
+        else if (energy == 220) {
+            if (layer = "X" && (barNumber == 0 || barNumber == 18 || barNumber == 4)) {
+                bins_fit_p = 3;
+            }
+            else if (layer == "X" && (barNumber == 8 || barNumber == 9)) {
+                bins_fit_p = 1;
+            }
+            else if (layer == "Y" && (barNumber == 1 || barNumber == 14 || barNumber == 15 || barNumber == 18 || barNumber == 19)) {
+                bins_fit_p = 3;
             }
         }
         int binLow1 = std::max(1, binMax1 - bins_fit_p);
@@ -305,31 +307,58 @@ std::pair<TFitResultPtr, TFitResultPtr> FitPeaksWithTSpectrum(TH1D *hist, double
             if (barNumber == 1) {
                 bins_fit_he = 7;
             }
+            else if (layer == "X" && (barNumber == 3 || barNumber == 4)) {
+                bins_fit_he = 5;
+            }
             else if (barNumber == 2 || (layer == "Y" && barNumber == 4)) {
                 bins_fit_he = 4;
             }
             else if (layer == "Y" && barNumber == 17) {
-                bins_fit_he = 7;
+                bins_fit_he = 10;
             }
             else if (barNumber == 19) {
-                bins_fit_he = 8;
+                bins_fit_he = 10;
             }
 
         }
         else if (energy == 140){
-            if (layer == "X" && (barNumber == 1 || barNumber == 4 || barNumber > 17)){
+            if (layer == "X" && (barNumber == 1 || barNumber == 4)){
                 bins_fit_he = 6;
+            }
+            else if (layer == "X" && barNumber == 3) {
+                bins_fit_he = 5;
+            }
+            else if (layer == "X" && barNumber == 7) {
+                bins_fit_he = 3;
+            }
+            else if (layer == "X" && (barNumber == 17 || barNumber == 18)) {
+                bins_fit_he = 7;
             }
             else if (layer == "Y" && (barNumber == 0 || barNumber > 14)){
                 bins_fit_he = 6;
+                if (barNumber == 0) {
+                    bins_fit_he = 7;
+                }
+                else if (barNumber == 17) {
+                    bins_fit_he = 8;
+                }
+            }
+            else if (layer == "Y" && barNumber == 3) {
+                bins_fit_he = 5;
+            }
+            else if (layer == "Y" && barNumber == 7) {
+                bins_fit_he = 3;
             }
         }
         else if (energy == 200) {
             if (barNumber < 2) {
                 bins_fit_he = 6;
             }
-            else if (layer == "X" && barNumber == 4) {
+            else if (layer == "X" && (barNumber == 4 || barNumber == 3 || barNumber == 14)) {
                 bins_fit_he = 5;
+            }
+            else if ((layer == "X" || layer == "Y") && barNumber == 7) {
+                bins_fit_he = 3;
             }
             else if (layer == "X" && (barNumber > 16 && barNumber != 18)) {
                 bins_fit_he = 6;   
@@ -340,19 +369,31 @@ std::pair<TFitResultPtr, TFitResultPtr> FitPeaksWithTSpectrum(TH1D *hist, double
         }
         else if (energy == 220) {
             if (layer == "X") {
-                if (barNumber == 3 || barNumber == 4) {
+                if (barNumber == 3) {
                     bins_fit_he = 6;
+                }
+                else if (barNumber == 4) {
+                    bins_fit_he = 7;
                 }
                 else if (barNumber == 0 || barNumber == 1) {
                     bins_fit_he = 8;
                 }
             }
             else if (layer == "Y") {
-                if (barNumber == 2 || barNumber == 1 || barNumber > 14) {
-                    bins_fit_he = 6;
+                if (barNumber == 1) {
+                    bins_fit_he = 8;
+                }
+                else if (barNumber == 2) {
+                    bins_fit_he = 9;
+                }
+                else if (barNumber > 14) {
+                    bins_fit_he = 8;
+                    if (barNumber == 19) {
+                        bins_fit_he = 1;
+                    }
                 }
                 else if (barNumber == 0) {
-                    bins_fit_he = 8;
+                    bins_fit_he = 1;
                 }
                 else if (barNumber == 6 || barNumber == 7) {
                     bins_fit_he = 3;
