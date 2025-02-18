@@ -1,16 +1,17 @@
 // Macro that plots the fit results on protons and helium peaks given by the AnalyzeTWFragm.cc macro vs the energies
-// retrieved from MC (2 energy loss values per bar and beam energy). The fit charge values vs energy loss values
-// are fitted with a 1 parameter linear function; these parameters (on per bar) are written in the configuration file.
+// loss values retrieved from MC (2 energy loss values per bar and beam energy, given by the AnalyzeTWMC.cc macro).
+// The fit charge values vs energy loss values are fitted with a 1 parameter linear function; these parameters (one per bar)
+// are written in the configuration file.
 // To be run with root -l -b -q 'CalibrateFragm.cc()'
 
 #include "CalibrateFragm.h"
 
 void CalibrateFragm() {
     std::vector<std::pair<std::string, int>> filesAndEnergies = {
-        {"TW/AnaFOOT_TW_Decoded_HIT2022_fragm_100MeV_Fit.root", 100},
-        {"TW/AnaFOOT_TW_Decoded_HIT2022_fragm_140MeV_Fit.root", 140},
-        {"TW/AnaFOOT_TW_Decoded_HIT2022_fragm_200MeV_Fit.root", 200},
-        {"TW/AnaFOOT_TW_Decoded_HIT2022_fragm_220MeV_Fit.root", 220}
+        {"TW/cuts/AnaFOOT_TW_Decoded_HIT2022_fragm_100MeV_Fit.root", 100},
+        {"TW/cuts/AnaFOOT_TW_Decoded_HIT2022_fragm_140MeV_Fit.root", 140},
+        {"TW/cuts/AnaFOOT_TW_Decoded_HIT2022_fragm_200MeV_Fit.root", 200},
+        {"TW/cuts/AnaFOOT_TW_Decoded_HIT2022_fragm_220MeV_Fit.root", 220}
     };
     // Smeared MC values
     // std::map<int, double>elossP = {{100, 2.721}, {140, 2.020}, {200, 1.4761}, {220, 1.4267}};  // energy loss for protons, from MC
@@ -45,11 +46,20 @@ void ProcessFile(const TString& fileName,
         return;
     }
 
+    // Access the "ChargeFit" directory
+    TDirectory* chargeFitDir = (TDirectory*)inputFile->Get("ChargeFit");
+    if (!chargeFitDir) {
+        std::cerr << "Directory 'ChargeFit' not found in file: " << fileName << std::endl;
+        inputFile->Close();
+        delete inputFile;
+        return;
+    }
+
     // Temporary storage for layer-bar combinations with both fits
     std::map<TString, std::pair<TFitResult *, TFitResult *>> validResults;
 
-    // Loop through all objects in the file
-    TIter nextKey(inputFile->GetListOfKeys());
+    // Loop through all objects in the "ChargeFit" directory
+    TIter nextKey(chargeFitDir->GetListOfKeys());
     TKey* key;
     while ((key = (TKey*)nextKey())) {
         TString objectName = key->GetName();
@@ -63,8 +73,8 @@ void ProcessFile(const TString& fileName,
         TString layerBarName = objectName;
         layerBarName.Remove(0, objectName.First('_') + 1);
 
-        // Retrieve the fit result object
-        TFitResult *fitResult = (TFitResult *)inputFile->Get(objectName);
+        // Retrieve the fit result object from "ChargeFit" directory
+        TFitResult *fitResult = (TFitResult *)chargeFitDir->Get(objectName);
         if (!fitResult || !fitResult->IsValid()) continue;
 
         // Store the fit result in the temporary map
@@ -96,6 +106,7 @@ void ProcessFile(const TString& fileName,
         fitErrorsP[layerBarName][energy] = errorP;
         fitMeansHe[layerBarName][energy] = meanHe;
         fitErrorsHe[layerBarName][energy] = errorHe;
+
         if (layerBarName == "LayerX_bar9") {
             cout << "meanP: " << meanP << " errorP: " << errorP << endl;
             cout << "meanHe: " << meanHe << " errorHe: " << errorHe << endl;
@@ -106,6 +117,7 @@ void ProcessFile(const TString& fileName,
     inputFile->Close();
     delete inputFile;
 }
+
 
 std::map<TString, double> PlotFitResultsCombined(
     const std::map<TString, std::map<int, double>>& fitMeansP,
@@ -144,8 +156,6 @@ std::map<TString, double> PlotFitResultsCombined(
                 }
             }
 
-            graphProtons->SetPoint(indexP+1, 0., 0.);
-
             // Add helium points
             for (int energy : energies) {
                 if (fitMeansHe.count(layerBarName) && fitMeansHe.at(layerBarName).count(energy)) {
@@ -180,7 +190,7 @@ std::map<TString, double> PlotFitResultsCombined(
             multiGraph->GetXaxis()->SetTitle("Energy loss MC [MeV]");
             multiGraph->GetYaxis()->SetTitle("Mean Charge [a.u.]");
             multiGraph->SetMinimum(0.);
-            //multiGraph->GetXaxis()->SetRangeUser(0., 15.);
+            multiGraph->GetXaxis()->SetLimits(0., 15.);
             multiGraph->Draw("A");
 
             // Combine data for fitting
@@ -232,7 +242,7 @@ std::map<TString, double> PlotFitResultsCombined(
             combinedFit->Draw("same");
 
             // Add legend
-            TLegend* legend = new TLegend(0.15, 0.68, 0.48, 0.85);
+            TLegend* legend = new TLegend(0.45, 0.25, 0.9, 0.50);
             legend->AddEntry(graphProtons, "Protons", "p");
             legend->AddEntry(graphHeliums, "Heliums", "p");
             auto [p0, p0Error] = RoundMeasurement(combinedFit->GetParameter(0), combinedFit->GetParError(0));
@@ -245,10 +255,10 @@ std::map<TString, double> PlotFitResultsCombined(
             //legend->AddEntry((TObject*)0, Form("p_{1} = %s#pm%s", p1.c_str(), p1Error.c_str()), "");
             //legend->AddEntry((TObject*)0, Form("p_{2} = %s#pm%s", p2.c_str(), p2Error.c_str()), "");
             //legend->AddEntry((TObject*)0, Form("p_{3} = %s#pm%s", p3.c_str(), p3Error.c_str()), "");
-            legend->SetTextSize(0.025);
+            legend->SetTextSize(0.03);
             legend->Draw();
 
-            c->SaveAs(Form("Plots/Fragmentation_%s.png", layerBarName.Data()));
+            c->SaveAs(Form("Plots/cuts/Fragmentation_%s.png", layerBarName.Data()));
 
             delete combinedFit;
             delete combinedGraph;
@@ -263,9 +273,6 @@ std::map<TString, double> PlotFitResultsCombined(
 }
 
 void WriteFitValuesOrdered(const std::map<TString, double>& fitValues) {
-    // Define the output file name inside the function
-    const std::string outputFileName = "TATW_Energy_calibration_perBar_HIT2022.cal";
-
     // Create a vector of pairs to allow sorting
     std::vector<std::tuple<int, TString, double>> sortedValues;
 
@@ -292,41 +299,50 @@ void WriteFitValuesOrdered(const std::map<TString, double>& fitValues) {
     }
 
     // Sort by the combined bar ID
-    // The lambda function is used to compare the first element of the tuple (get<0> a and get<0> b) 
     std::sort(sortedValues.begin(), sortedValues.end(),
               [](const auto& a, const auto& b) { return std::get<0>(a) < std::get<0>(b); });
 
-    // Open the output file
-    std::ofstream outFile(outputFileName);
-    if (!outFile.is_open()) {
-        std::cerr << "Error: Unable to open file " << outputFileName << std::endl;
-        return;
+    // Define the four output file names
+    std::vector<std::string> outputFileNames = {
+        "TATW_Energy_calibration_perBar_HIT2022_100MeV_u.cal",
+        "TATW_Energy_calibration_perBar_HIT2022_140MeV_u.cal",
+        "TATW_Energy_calibration_perBar_HIT2022_200MeV_u.cal",
+        "TATW_Energy_calibration_perBar_HIT2022_220MeV_u.cal"
+    };
+
+    // Write the content to each file
+    for (const auto& outputFileName : outputFileNames) {
+        std::ofstream outFile(outputFileName);
+        if (!outFile.is_open()) {
+            std::cerr << "Error: Unable to open file " << outputFileName << std::endl;
+            continue;
+        }
+
+        // Write header
+        outFile << "#BarId(Pisa)          p0                 p1        layer(SHOE)" << std::endl;
+        outFile << "#-+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+-+-+-+-+-+-+-+-+-+-\n";
+
+        // Write data
+        for (const auto& entry : sortedValues) {
+            int combinedBarID = std::get<0>(entry);  // Combined bar ID
+            const TString& layerBarName = std::get<1>(entry);
+            double p0 = std::get<2>(entry);
+
+            // Determine the layer (0 for Y, 1 for X)
+            int layerShoe = layerBarName.Contains("LayerX") ? 1 : 0;
+
+            // Write output (p1 is always 0)
+            outFile << std::setw(10) << combinedBarID
+                    << std::setw(20) << p0
+                    << std::setw(12) << 0.0
+                    << std::setw(10) << layerShoe
+                    << std::endl;
+        }
+
+        outFile << "#-+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+-+-+-+-+-+-+-+-+-+-\n";
+        outFile.close();
+        std::cout << "Fit values written to file: " << outputFileName << std::endl;
     }
-
-    // Write header
-    outFile << "#BarId(Pisa)          p0          p1 layer(SHOE)" << std::endl;
-    outFile << "#-+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+-+-+-+-+-+-+-+-+-+-\n";
-
-    // Write data
-    for (const auto& entry : sortedValues) {
-        int combinedBarID = std::get<0>(entry);  // Combined bar ID
-        const TString& layerBarName = std::get<1>(entry);
-        double p0 = std::get<2>(entry);
-
-        // Determine the layer (0 for Y, 1 for X)
-        int layerShoe = layerBarName.Contains("LayerX") ? 1 : 0;
-
-        // Write output (p1 is always 0)
-        outFile << std::setw(10) << combinedBarID
-                << std::setw(20) << p0
-                << std::setw(12) << 0.0
-                << std::setw(10) << layerShoe
-                << std::endl;
-    }
-
-    outFile << "#-+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+-+-+-+-+-+-+-+-+-+-\n";
-    outFile.close();
-    std::cout << "Fit values written to file: " << outputFileName << std::endl;
 }
 
 pair<std::string, std::string> RoundMeasurement(double value, double uncertainty) {

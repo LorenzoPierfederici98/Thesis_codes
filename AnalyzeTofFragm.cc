@@ -151,6 +151,7 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
             {
                 if (barNumber == 0)
                 {
+                    peakPosition = 11.8;
                     binFit = 5;
                 }
                 else if (barNumber == 17)
@@ -166,7 +167,7 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
                 else if (barNumber == 19)
                 {
                     peakPosition = 11.9;
-                    binFit = 10;
+                    binFit = 15;
                 }
             }
             else if (layer == "Y")
@@ -180,12 +181,15 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
                 {
                     binFit = 8;
                 }
-                else if (barNumber == 13) {
+                else if (barNumber == 3) {
+                    binFit = 5;
+                }
+                else if (barNumber == 12 || barNumber == 13) {
                     binFit = 3;
                 }
                 else if (barNumber == 19)
                 {
-                    peakPosition = 12.5;
+                    peakPosition = 12.2;
                     binFit = 20;
                 }
             }
@@ -199,12 +203,18 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
                     peakPosition = 10.1;
                     binFit = 10;
                 }
-                else if (barNumber == 1 || barNumber == 2)
+                else if (barNumber == 1) {
+                    peakPosition = 10.;
+                    binFit = 10;
+                }
+                else if (barNumber == 2)
                 {
+                    peakPosition = 9.98;
                     binFit = 10;
                 }
                 else if (barNumber == 3)
                 {
+                    peakPosition = 10.3;
                     binFit = 13;
                 }
                 else if (barNumber == 4)
@@ -217,7 +227,8 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
                 }
                 else if (barNumber == 15)
                 {
-                    binFit = 10;
+                    peakPosition = 9.9;
+                    binFit = 12;
                 }
                 else if (barNumber == 17)
                 {
@@ -244,7 +255,8 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
                 }
                 else if (barNumber == 1)
                 {
-                    binFit = 6;
+                    peakPosition = 10.1;
+                    binFit = 8;
                 }
                 else if (barNumber == 3)
                 {
@@ -285,6 +297,9 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
                 if (barNumber < 3)
                 {
                     binFit = 10;
+                    if (barNumber == 1) {
+                        peakPosition = 8.5;
+                    }
                 }
                 if (barNumber == 3)
                 {
@@ -312,7 +327,7 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
                 else if (barNumber == 19)
                 {
                     peakPosition = 9.2;
-                    binFit = 10;
+                    binFit = 13;
                 }
             }
             else if (layer == "Y")
@@ -329,13 +344,18 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
                 }
                 else if (barNumber == 2)
                 {
+                    peakPosition = 8.6;
                     binFit = 7;
                 }
                 else if (barNumber == 3 || barNumber == 4)
                 {
                     binFit = 7;
                 }
-                else if (barNumber == 17 || barNumber == 18)
+                else if (barNumber == 17) {
+                    peakPosition = 8.8;
+                    binFit = 9;
+                }
+                else if (barNumber == 18)
                 {
                     binFit = 10;
                 }
@@ -372,11 +392,17 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
                 else if (barNumber == 13 || barNumber == 15)
                 {
                     binFit = 7;
+                    if (barNumber == 15) {
+                        peakPosition = 7.9;
+                    }
                 }
                 else if (barNumber == 16)
                 {
                     peakPosition = 8.3;
                     binFit = 10;
+                }
+                else if (barNumber == 17) {
+                    peakPosition = 7.87;
                 }
                 else if (barNumber == 18)
                 {
@@ -385,6 +411,7 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
                 }
                 else if (barNumber == 19)
                 {
+                    peakPosition = 8.7;
                     binFit = 10;
                 }
             }
@@ -392,20 +419,28 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
             {
                 if (barNumber == 0)
                 {
-                    binFit = 10;
+                    peakPosition = 8.6;
+                    binFit = 8;
                 }
                 else if (barNumber == 1)
                 {
                     peakPosition = 8.5;
-                    binFit = 6;
+                    binFit = 7;
                 }
                 else if (barNumber == 2) {
+                    peakPosition = 8.56;
                     binFit = 7;
+                }
+                else if (barNumber == 4) {
+                    binFit = 6;
                 }
                 else if (barNumber == 14)
                 {
                     peakPosition = 8.3;
                     binFit = 8;
+                }
+                else if (barNumber == 15) {
+                    binFit = 7;
                 }
                 else if (barNumber == 16)
                 {

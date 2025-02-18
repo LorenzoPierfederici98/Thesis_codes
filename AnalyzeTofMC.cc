@@ -179,7 +179,7 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
                 else if (barNumber == 0) {
                     binFit = 5;
                 }
-                else if (barNumber ==2 || barNumber == 5) {
+                else if (barNumber == 2 || barNumber == 5) {
                     binFit = 4;
                 }
                 else if (barNumber == 8 || barNumber == 10) {
@@ -210,6 +210,9 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
                     peakPosition = 10.3;
                     binFit = 15;
                 }
+                else if (barNumber == 1) {
+                    binFit = 5;
+                }
                 else if (barNumber == 2) {
                     binFit = 4;
                 }
@@ -221,7 +224,7 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
                     binFit = 6;
                 }
                 else if (barNumber == 5) {
-                    binFit = 7;
+                    binFit = 8;
                 }
                 else if (barNumber == 13 || barNumber == 14 || barNumber == 15) {
                     binFit = 6;
@@ -254,7 +257,8 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
                     binFit = 10;
                     if (barNumber == 1)
                     {
-                        binFit = 12;
+                        peakPosition = 10.;
+                        binFit = 6;
                     }
                     else if (barNumber == 0 || barNumber == 2) {
                         peakPosition = 10.2;
@@ -271,7 +275,10 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
                 else if (barNumber == 7) {
                     binFit = 2;
                 }
-                else if (barNumber == 13 || barNumber == 14 || barNumber == 15)
+                else if (barNumber == 13) {
+                    binFit = 4;
+                }
+                else if (barNumber == 14 || barNumber == 15)
                 {
                     binFit = 5;
                 }
@@ -289,7 +296,6 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
                 } 
                 else if (barNumber == 19)
                 {
-                    peakPosition = 10.3;
                     binFit = 11;
                 }
             }
@@ -410,7 +416,7 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
             if (layer == "Y") {
                 if (barNumber == 0) {
                     peakPosition = 8.6;
-                    binFit = 10;
+                    binFit = 11;
                 }
                 else if (barNumber == 1) {
                     peakPosition = 8.5;
