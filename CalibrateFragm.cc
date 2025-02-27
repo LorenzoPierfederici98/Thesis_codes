@@ -17,7 +17,8 @@ void CalibrateFragm() {
     // std::map<int, double>elossP = {{100, 2.721}, {140, 2.020}, {200, 1.4761}, {220, 1.4267}};  // energy loss for protons, from MC
     // std::map<int, double>elossHe = {{100, 9.7638}, {140, 7.2929}, {200, 5.4135}, {220, 5.2352}};  // energy loss for heliums, from MC
 
-    std::map<int, double>elossP = {{100, 2.621}, {140, 1.901}, {200, 1.410}, {220, 1.325}};  // energy loss for protons, from MC
+    //std::map<int, double>elossP = {{100, 2.621}, {140, 1.901}, {200, 1.410}, {220, 1.325}};  // energy loss for protons, from MC (no cuts)
+    std::map<int, double>elossP = {{100, 2.551}, {140, 1.900}, {200, 1.441}, {220, 1.367}};
     std::map<int, double>elossHe = {{100, 9.7371}, {140, 7.2586}, {200, 5.5314}, {220, 5.1694}};  // energy loss for heliums, from MC
 
     std::map<TString, std::map<int, double>> fitMeansP;  // protons
@@ -186,7 +187,7 @@ std::map<TString, double> PlotFitResultsCombined(
                                       Form("Fit Results - %s", layerBarName.Data()), 
                                       800, 600);
 
-            multiGraph->SetTitle(Form("%s - Fit Results true MC", layerBarName.Data()));
+            multiGraph->SetTitle(Form("%s - fit results calibration", layerBarName.Data()));
             multiGraph->GetXaxis()->SetTitle("Energy loss MC [MeV]");
             multiGraph->GetYaxis()->SetTitle("Mean Charge [a.u.]");
             multiGraph->SetMinimum(0.);
