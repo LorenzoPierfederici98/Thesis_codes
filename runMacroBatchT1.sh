@@ -111,6 +111,10 @@ echo $jobExec_base
 cat <<EOF > $jobExec
 #!/bin/bash
 
+export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:/lib64/:/lib/
+
+export HOME=\$(pwd)
+
 cd ${SHOE_PATH}/build/Reconstruction
 source ${SHOE_PATH}/build/setupFOOT.sh
 
