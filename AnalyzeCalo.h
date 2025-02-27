@@ -158,7 +158,10 @@ Bool_t debug              = false;
 Bool_t calibTw            = false;
 Bool_t isTwScan           = true;
 Bool_t readBinTwCalibFile = false;
-
+// true for fragmentation runs. For non-fragmentation runs the charge of every crystal
+// in the cluster size is normalized to the charge of the entire cluster size, while for
+// fragmentation runs only the charge is computed
+Bool_t fragm = false;  
 enum{kCharges=8,kLayers=2,kBars=20};  //TW
 enum{kModules=7, kCrysPerModule=9};  //Calorimeter
 // enum{kCharges=8,kLayers=2,kCentralBars=3};
@@ -190,9 +193,9 @@ typedef std::vector<std::pair<Int_t,Int_t> > TVecPair;
 // TH1F*           fpHisStripMap[MaxPlane];   ///< strip map
 
 TH1D *Charge_Calo_total;  //charge in all calo
-TH1D *Charge_Calo_Module[kModules];  //charge per module in calo
+//TH1D *Charge_Calo_Module[kModules];  //charge per module in calo
 TH1D *Charge_Calo_crystal[kModules * kCrysPerModule];  //charge per crystal id in calo
-TH1D *Charge_Calo_crystal_cluster[2];
+TH1D *ClusterCharge_Calo_crystal[kModules * kCrysPerModule];
 
 TH1D *Clusters_size;
 TH1D *Clusters_number;

@@ -96,7 +96,9 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
   fout->cd();
   TDirectory *DirChargeTimeLayerX = fout->mkdir("ChargeTimeLayerX");
   TDirectory *DirChargeTimeLayerY = fout->mkdir("ChargeTimeLayerY");
-  BookHistograms();
+  TDirectory *DirToFLayerX = fout->mkdir("ToFLayerX");
+  TDirectory *DirToFLayerY = fout->mkdir("ToFLayerY");
+  BookHistograms(DirChargeTimeLayerX, DirChargeTimeLayerY, DirToFLayerX, DirToFLayerY);
 
   TVecPair vPairWrongZ;
   vPairWrongZ.clear();
@@ -137,19 +139,24 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
   printf("Total Entries to be processed::%d\n\n", (int)nentries);
   string beamEnergyStr;
 
-  if (runNumber == 4723 || runNumber == 4725 || runNumber == 4726 || runNumber == 4628){
+  if (runNumber == 4723 || runNumber == 4725 || runNumber == 4726 || runNumber == 4628)
+  {
     beamEnergyStr = to_string(180.0);
   }
-  else if (runNumber == 4727 || runNumber == 4728){
+  else if (runNumber == 4727 || runNumber == 4728)
+  {
     beamEnergyStr = to_string(140.0);
   }
-  else if (runNumber == 4624){
+  else if (runNumber == 4624)
+  {
     beamEnergyStr = to_string(110.0);
-    }
-  else if (runNumber == 4625){
+  }
+  else if (runNumber == 4625)
+  {
     beamEnergyStr = to_string(130.0);
   }
-  else {
+  else
+  {
     beamEnergyStr = to_string(parGeo->GetBeamPar().Energy * 1000);
   }
 
@@ -163,7 +170,12 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
   nentriesObj.Write(Form("nentries run %d", runNumber));
   // Loop over the TTree
   gTAGroot.BeginEventLoop();
-
+  int pointIndex_9 = 0;
+  int pointIndex_7 = 0;
+  TCanvas *c = new TCanvas("c", "Scatter Plot", 800, 600);
+  TGraph *scatterPlot_bar9 = new TGraph();
+  TGraph *scatterPlot_bar7 = new TGraph();
+  Int_t energy = std::stoi(beamEnergyStr);
   Int_t ev = -1;
   while (gTAGroot.NextEvent() && ev != nentries)
   {
@@ -194,94 +206,152 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
     Int_t nHitsX = twNtuHit->GetHitN((Int_t)LayerX);
     Int_t nHitsY = twNtuHit->GetHitN((Int_t)LayerY);
 
+    hHits_X->Fill(nHitsX);
+    hHits_Y->Fill(nHitsY);
+
+    Int_t nValidHitsX = 0;
+    Int_t nValidHitsY = 0;
+
+    // Track which hitY has already been counted
+    std::vector<bool> countedY(nHitsY, false);
+
     if (debug)
       cout << " TWhits X::" << nHitsX << " Y::" << nHitsY << endl;
+
+    // Indexes to select the valid hits and fill the histograms
+    // when there's 1 valid hit on both X and Y layers
+    Int_t hitNumber_X;
+    Int_t hitNumber_Y;
 
     for (int ihitX = 0; ihitX < nHitsX; ihitX++)
     {
 
       TATWhit *hitX = twNtuHit->GetHit(ihitX, (Int_t)LayerX);
-      if (!hitX->IsValid()) continue;
       Double_t posAlongX = hitX->GetPosition(); // it provides the X coordinate
       Double_t posBarY = twparGeo->GetBarPosition((Int_t)LayerX, hitX->GetBar())[1];
       Double_t barX = hitX->GetBar();
+      Double_t QAX = hitX->GetChargeChA();
+      Double_t QBX = hitX->GetChargeChB();
+      Double_t QBarX = sqrt(QAX * QBX);
 
-      Bar_ID_X->Fill(barX);
+      // if ((energy == 100 && QBarX > 1. && QBarX < 15.) ||
+      //     (energy == 140 && QBarX > 1. && QBarX < 12.) ||
+      //     (energy == 200 && QBarX > 1. && QBarX < 9.) ||
+      //     (energy == 220 && QBarX > 0.85 && QBarX < 8.5))
+      if (hitX->IsValid() && ((energy == 100 && QBarX > 1.) ||
+          (energy == 140 && QBarX > 0.95) ||
+          (energy == 200 && QBarX > 0.8) ||
+          (energy == 220 && QBarX > 0.7)))
+      {
+        nValidHitsX++;
+        hitNumber_X = ihitX;
+      }
+
+      //Bar_ID_X->Fill(barX);
       PosX->Fill(posAlongX);
 
       for (int ihitY = 0; ihitY < nHitsY; ihitY++)
       {
 
         TATWhit *hitY = twNtuHit->GetHit(ihitY, (Int_t)LayerY);
-        if (!hitY->IsValid()) continue;
         Double_t posAlongY = hitY->GetPosition(); // it provides the Y coordinate
         Double_t posBarX = twparGeo->GetBarPosition((Int_t)LayerY, hitY->GetBar())[0];
-        Double_t tof_y_bar9 = hitY->GetToF();
-        Double_t tof_y_bar8 = hitY->GetToF();
         Double_t barY = hitY->GetBar();
+        Double_t QAY = hitY->GetChargeChA();
+        Double_t QBY = hitY->GetChargeChB();
+        Double_t QBarY = sqrt(QAY * QBY);
 
-        Bar_ID_Y->Fill(barY);
+        // if (!countedY[ihitY] &&
+        //     ((energy == 100 && QBarY > 1. && QBarY < 15.) ||
+        //      (energy == 140 && QBarY > 1. && QBarY < 12.) ||
+        //      (energy == 200 && QBarY > 1. && QBarY < 9.) ||
+        //      (energy == 220 && QBarY > 0.85 && QBarY < 8.5)))
+        if (hitY->IsValid() && !countedY[ihitY] && ((energy == 100 && QBarY > 1.) ||
+          (energy == 140 && QBarY > 0.95) ||
+          (energy == 200 && QBarY > 0.8) ||
+          (energy == 220 && QBarY > 0.7)))
+        {
+          nValidHitsY++;
+          countedY[ihitY] = true; // Mark this hitY as counted
+          hitNumber_Y = ihitY;
+        }
+
+        //Bar_ID_Y->Fill(barY);
         PosY->Fill(posAlongY);
         hTwMapPos->Fill(posAlongX, posAlongY);
-
-        if (barX == 9 && barY == 9)
-        {
-          hToF_Bar9->Fill(tof_y_bar9);
-        }
-
-        if (barX == 8 && barY == 8)
-        {
-          hToF_Bar8->Fill(tof_y_bar8);
-        }
-
-        if (debug)
-        {
-          cout << " alongX::" << posAlongX << " alongY::" << posAlongY << " BarX::" << posBarX << " BarY::" << posBarY << endl;
-          cout << " BarX_ID::::" << hitX->GetBar() << " BarY_ID::" << hitY->GetBar() << endl;
-        }
-
-        if (debug)
-        {
-          cout << " hitX_dE::" << hitX->GetEnergyLoss() << " hitY_dE::" << hitY->GetEnergyLoss() << endl;
-          cout << " hitX_tof::" << hitX->GetToF() << " hitY_tof::" << hitY->GetToF() << endl;
-          // cout<<" hitX_Z::"<<hitX->GetChargeZ()<<" hitY_Z::"<<hitY->GetChargeZ()<<endl;
-        }
       }
+    }
+
+    if (ev % 10000 == 0)
+    {
+      cout << "Energy [MeV/u]: " << energy << endl;
+      cout << "nHitsX: " << nHitsX << " nHitsY: " << nHitsY << endl;
+      cout << "nValidHitsX: " << nValidHitsX << " nValidHitsY: " << nValidHitsY << endl;
+    }
+
+    h_nValidHits_X->Fill(nValidHitsX);
+    h_nValidHits_Y->Fill(nValidHitsY);
+
+    if (nValidHitsX == 1 && nValidHitsY == 1)
+    {
+      TATWhit *hitX = twNtuHit->GetHit(hitNumber_X, (Int_t)LayerX);
+      Int_t barX = hitX->GetBar();
+      Double_t QAX = hitX->GetChargeChA();
+      Double_t QBX = hitX->GetChargeChB();
+      Double_t QBarX = sqrt(QAX * QBX);
+      Double_t tofX = hitX->GetToF();
+
+      TATWhit *hitY = twNtuHit->GetHit(hitNumber_Y, (Int_t)LayerY);
+      Int_t barY = hitY->GetBar();
+      Double_t QAY = hitY->GetChargeChA();
+      Double_t QBY = hitY->GetChargeChB();
+      Double_t QBarY = sqrt(QAY * QBY);
+      Double_t tofY = hitY->GetToF();
+
+      Bar_ID_X->Fill(barX);
+      Bar_ID_Y->Fill(barY);
+
+      Charge_perBar[(Int_t)LayerX][barX]->Fill(QBarX);
+      Charge_perBar[(Int_t)LayerY][barY]->Fill(QBarY);
+      hToF[(Int_t)LayerX][barX]->Fill(tofX);
+      hToF[(Int_t)LayerY][barY]->Fill(tofY);
     }
 
     if (nHitsX == 1 && nHitsY == 1)
     {
-      Double_t posAlongX = 999, posBarX = 999, posAlongY = 999, posBarY = 999;
-      Int_t barID_1hit_X = -1, barID_1hit_Y = -1;
 
       TATWhit *hitX = twNtuHit->GetHit(0, (Int_t)LayerX);
-      if (hitX->IsValid()) {
+
+      Int_t bar_x = hitX->GetBar();
       Double_t posAlongX = hitX->GetPosition(); // it provides the X coordinate
-      Int_t barID_1hit_X = hitX->GetBar();
-      Double_t posBarY = twparGeo->GetBarPosition((Int_t)LayerX, barID_1hit_X)[1];
-      Double_t chargeAX = hitX->GetChargeChA();
-      Double_t chargeBX = hitX->GetChargeChB();
-      }
+      Double_t posBarY = twparGeo->GetBarPosition((Int_t)LayerX, bar_x)[1];
 
       TATWhit *hitY = twNtuHit->GetHit(0, (Int_t)LayerY);
-      if (hitY->IsValid()) {
-        Double_t posAlongY = hitY->GetPosition(); // it provides the Y coordinate
-        Int_t barID_1hit_Y = hitY->GetBar();
-        Double_t posBarX = twparGeo->GetBarPosition((Int_t)LayerY, barID_1hit_Y)[0];
-        Double_t chargeAY = hitY->GetChargeChA();
-        Double_t chargeBY = hitY->GetChargeChB();
+      Int_t bar_y = hitY->GetBar();
+      Double_t posAlongY = hitY->GetPosition(); // it provides the Y coordinate
+      Double_t posBarX = twparGeo->GetBarPosition((Int_t)LayerY, bar_y)[0];
+
+      if (ev % 100000 == 0)
+      {
+        cout << "1 hit in each layer" << endl;
+        cout << "BarX_ID: " << bar_x << " BarY_ID: " << bar_y << endl;
       }
 
       if (
-      hitX->IsValid() && hitY->IsValid() && 
-      posAlongX != 999 && posBarX != 999 && 
-      posAlongY != 999 && posBarY != 999 &&
-      barID_1hit_X != -1 && barID_1hit_Y != -1
-      ) {
+          hitX && hitY && hitX->IsValid() && hitY->IsValid())
+      {
         hResX_1Cross->Fill(posAlongX - posBarX);
         hResY_1Cross->Fill(posAlongY - posBarY);
         hTwMapPos_1Cross->Fill(posAlongX, posAlongY);
-        hBarID_1Cross->Fill(barID_1hit_X, barID_1hit_Y);
+        hBarID_1Cross->Fill(bar_x, bar_y);
+      }
+    }
+    else
+    {
+      if (ev % 100000 == 0)
+      {
+        cout << "No 1 hit in each layer" << endl;
+        cout << "nHitsX: " << nHitsX << " nHitsY: " << nHitsY << endl;
       }
     }
 
@@ -299,106 +369,127 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
 
       Int_t bar = hit->GetBar();
       Int_t layer = hit->GetLayer();
-      Int_t NmcTrk = hit->GetMcTracksN();
+      // Int_t NmcTrk = hit->GetMcTracksN();
       Double_t eloss = hit->GetEnergyLoss();
       Double_t tof = hit->GetToF();
-      Int_t Z = hit->GetChargeZ();
+      // Int_t Z = hit->GetChargeZ();
       Double_t chargeA = hit->GetChargeChA();
       Double_t chargeB = hit->GetChargeChB();
       Double_t chargeBar = sqrt(chargeA * chargeB);
       Double_t timeA = hit->GetTimeChA();
       Double_t timeB = hit->GetTimeChB();
       Double_t timeBar = 0.5 * (timeA + timeB);
+      Double_t amplA = hit->GetAmplitudeChA();
+      Double_t amplB = hit->GetAmplitudeChB();
+      Double_t ampl = sqrt(amplA * amplB);
 
-      if (debug)
-        printf("twhit::%d  %s  bar::%d  Z::%d  eloss::%f  NmcTrk::%d\n", ihit, LayerName[(TLayer)layer].data(), bar, Z, eloss, NmcTrk);
+      // if (debug)
+      //  printf("twhit::%d  %s  bar::%d  Z::%d  eloss::%f  NmcTrk::%d\n", ihit, LayerName[(TLayer)layer].data(), bar, Z, eloss, NmcTrk);
 
       if (!calibTw)
       {
         // dE_vs_tof_perBar[layer][bar]->Fill(tof,eloss);
-        dE_vs_tof[layer]->Fill(tof, eloss);
-        heloss_all->Fill(eloss);
-        Charge_vs_tof->Fill(tof, chargeBar);
-        ChargeA_perBar[layer][bar]->Fill(chargeA);
-        ChargeA_perBar[layer][bar]->SetDirectory(0);
-        ChargeB_perBar[layer][bar]->Fill(chargeB);
-        ChargeB_perBar[layer][bar]->SetDirectory(0);
-        Charge_perBar[layer][bar]->Fill(chargeBar);
-        Charge_perBar[layer][bar]->SetDirectory(0);
-        TimeA_perBar[layer][bar]->Fill(timeA);
-        TimeA_perBar[layer][bar]->SetDirectory(0);
-        TimeB_perBar[layer][bar]->Fill(timeB);
-        TimeB_perBar[layer][bar]->SetDirectory(0);
-        Time_perBar[layer][bar]->Fill(timeBar);
-        Time_perBar[layer][bar]->SetDirectory(0);
+        // dE_vs_tof[layer]->Fill(tof, eloss);
+        // heloss_all->Fill(eloss);
 
-      }
+        //  hToF[layer][bar]->Fill(tof);
+        //  Charge_vs_tof->Fill(tof, chargeBar);
+        //   ChargeA_perBar[layer][bar]->Fill(chargeA);
+        //   ChargeB_perBar[layer][bar]->Fill(chargeB);
+        //  Charge_perBar[layer][bar]->Fill(chargeBar);
+        //   TimeA_perBar[layer][bar]->Fill(timeA);
+        //   TimeB_perBar[layer][bar]->Fill(timeB);
+        //  Time_perBar[layer][bar]->Fill(timeBar);
 
-      static Double_t posAlongX_Bar9 = -999; // Static variables to store X and Y positions for bar 9
-      static Double_t posAlongY_Bar9 = -999;
+        Charge_perBar_noCuts[layer][bar]->Fill(chargeBar);
+        hToF_noCuts[layer][bar]->Fill(tof);
 
-      if (layer == (Int_t)LayerX)
-      {
-        Double_t posAlongX = hit->GetPosition();
-        if (bar == 9)
+        if (bar == 7 || bar == 9)
         {
-          PosX_Bar9->Fill(posAlongX);
-          posAlongX_Bar9 = posAlongX; // Store the X position for bar 9
-          if (posAlongY_Bar9 != -999)
-          {                                                       // Check if Y position is already set
-            hTwMapPos_Bar9->Fill(posAlongX_Bar9, posAlongY_Bar9); // Fill the 2D histogram
-            posAlongX_Bar9 = -999;                                // Reset after filling
-            posAlongY_Bar9 = -999;                                // Reset after filling
+          if (layer == (Int_t)LayerX)
+          {
+            if (bar == 7)
+            {
+              Ampl_PerBar_LayerX_Bar7->Fill(ampl);
+              scatterPlot_bar7->SetPoint(pointIndex_7++, ampl, chargeBar);
+            }
+            else
+            {
+              Ampl_PerBar_LayerX_Bar9->Fill(ampl);
+              scatterPlot_bar9->SetPoint(pointIndex_9++, ampl, chargeBar);
+            }
+          }
+          else if (layer == (Int_t)LayerY)
+          {
+            if (bar == 7)
+            {
+              Ampl_PerBar_LayerY_Bar7->Fill(ampl);
+            }
+            else
+            {
+              Ampl_PerBar_LayerY_Bar9->Fill(ampl);
+            }
           }
         }
-        Double_t posBarY = twparGeo->GetBarPosition(layer, bar)[1];
-        hTwPos[layer]->Fill(posAlongX, posBarY);
-      }
-      else if (layer == (Int_t)LayerY)
-      {
-        Double_t posAlongY = hit->GetPosition();
-        if (bar == 9)
+
+        static Double_t posAlongX_Bar9 = -999; // Static variables to store X and Y positions for bar 9
+        static Double_t posAlongY_Bar9 = -999;
+
+        if (layer == (Int_t)LayerX)
         {
-          PosY_Bar9->Fill(posAlongY);
-          posAlongY_Bar9 = posAlongY; // Store the Y position for bar 9
-          if (posAlongX_Bar9 != -999)
-          {                                                       // Check if X position is already set
-            hTwMapPos_Bar9->Fill(posAlongX_Bar9, posAlongY_Bar9); // Fill the 2D histogram
-            posAlongX_Bar9 = -999;                                // Reset after filling
-            posAlongY_Bar9 = -999;                                // Reset after filling
+          Double_t posAlongX = hit->GetPosition();
+          if (bar == 9)
+          {
+            PosX_Bar9->Fill(posAlongX);
+            posAlongX_Bar9 = posAlongX; // Store the X position for bar 9
+            if (posAlongY_Bar9 != -999)
+            {                                                       // Check if Y position is already set
+              hTwMapPos_Bar9->Fill(posAlongX_Bar9, posAlongY_Bar9); // Fill the 2D histogram
+              posAlongX_Bar9 = -999;                                // Reset after filling
+              posAlongY_Bar9 = -999;                                // Reset after filling
+            }
           }
+          Double_t posBarY = twparGeo->GetBarPosition(layer, bar)[1];
+          hTwPos[layer]->Fill(posAlongX, posBarY);
         }
-        Double_t posBarX = twparGeo->GetBarPosition(layer, bar)[0];
-        hTwPos[layer]->Fill(posBarX, posAlongY);
+        else if (layer == (Int_t)LayerY)
+        {
+          Double_t posAlongY = hit->GetPosition();
+          if (bar == 9)
+          {
+            PosY_Bar9->Fill(posAlongY);
+            posAlongY_Bar9 = posAlongY; // Store the Y position for bar 9
+            if (posAlongX_Bar9 != -999)
+            {                                                       // Check if X position is already set
+              hTwMapPos_Bar9->Fill(posAlongX_Bar9, posAlongY_Bar9); // Fill the 2D histogram
+              posAlongX_Bar9 = -999;                                // Reset after filling
+              posAlongY_Bar9 = -999;                                // Reset after filling
+            }
+          }
+          Double_t posBarX = twparGeo->GetBarPosition(layer, bar)[0];
+          hTwPos[layer]->Fill(posBarX, posAlongY);
+        }
       }
     }
   }
 
   gTAGroot.EndEventLoop();
-
-
-  // After the loop, switch to the correct directory and write the histograms
-  DirChargeTimeLayerY->cd();
-  for (int bar = 0; bar < kBars; ++bar)
-  {
-    ChargeA_perBar[0][bar]->Write();
-    ChargeB_perBar[0][bar]->Write();
-    Charge_perBar[0][bar]->Write();
-    TimeA_perBar[0][bar]->Write();
-    TimeB_perBar[0][bar]->Write();
-    Time_perBar[0][bar]->Write();
-  }
-
-  DirChargeTimeLayerX->cd();
-  for (int bar = 0; bar < kBars; ++bar)
-  {
-    ChargeA_perBar[1][bar]->Write();
-    ChargeB_perBar[1][bar]->Write();
-    Charge_perBar[1][bar]->Write();
-    TimeA_perBar[1][bar]->Write();
-    TimeB_perBar[1][bar]->Write();
-    Time_perBar[1][bar]->Write();
-  }
+  scatterPlot_bar9->SetLineStyle(0);
+  scatterPlot_bar9->SetLineWidth(0);
+  scatterPlot_bar7->SetLineStyle(0);
+  scatterPlot_bar7->SetLineWidth(0);
+  scatterPlot_bar9->SetMarkerStyle(20); // Set marker style
+  scatterPlot_bar9->SetMarkerSize(0.4);
+  scatterPlot_bar9->SetTitle("Scatter Plot Ampl vs Charge LayerX bar 9");
+  scatterPlot_bar9->GetXaxis()->SetTitle("Amplitude [a.u.]");
+  scatterPlot_bar9->GetYaxis()->SetTitle("Charge [a.u.]");
+  scatterPlot_bar9->Write("Scatter Plot Ampl vs Charge LayerX bar 9");
+  scatterPlot_bar7->SetMarkerStyle(20); // Set marker style
+  scatterPlot_bar7->SetMarkerSize(0.4);
+  scatterPlot_bar7->SetTitle("Scatter Plot Ampl vs Charge LayerX bar 7");
+  scatterPlot_bar7->GetXaxis()->SetTitle("Amplitude [a.u.]");
+  scatterPlot_bar7->GetYaxis()->SetTitle("Charge [a.u.]");
+  scatterPlot_bar7->Write("Scatter Plot Ampl vs Charge LayerX bar 7");
 
   cout << endl
        << "Job Done!" << endl;
@@ -438,7 +529,8 @@ void InitializeContainers()
 
 //-----------------------------------------------------------------------------
 
-void BookHistograms()
+void BookHistograms(TDirectory *DirChargeTimeLayerX, TDirectory *DirChargeTimeLayerY,
+                    TDirectory *DirToFLayerX, TDirectory *DirToFLayerY)
 {
 
   // fpHisSeedMap = new TH1F(Form("msSeedMap%d", 4+1), Form("MSD - seed map for sensor %d", i+1), pGeoMap->GetStripsN(), 0, msdparGeo->GetStripsN());
@@ -453,8 +545,16 @@ void BookHistograms()
   PosY_Bar9 = new TH1D("Hit_Pos_LayerY_Bar9", "Hit_Pos_LayerY_Bar9", 220, -22., 22.);
   Bar_ID_X = new TH1D("BarID_LayerX", "BarID_LayerX", 200, 0, 19);
   Bar_ID_Y = new TH1D("BarID_LayerY", "BarID_LayerY", 200, 0, 19);
-  hToF_Bar8 = new TH1D("ToF_Bar8_XY", "ToF_Bar8_XY", 220, 6., 20.);
-  hToF_Bar9 = new TH1D("ToF_Bar9_XY", "ToF_Bar9_XY", 220, 6., 20.);
+
+  Ampl_PerBar_LayerX_Bar7 = new TH1D("Ampl_PerBar_LayerX_Bar7", "Ampl_PerBar_LayerX_Bar7", 200, -0.2, 1.2);
+  Ampl_PerBar_LayerX_Bar9 = new TH1D("Ampl_PerBar_LayerX_Bar9", "Ampl_PerBar_LayerX_Bar9", 200, -0.2, 1.2);
+  Ampl_PerBar_LayerY_Bar7 = new TH1D("Ampl_PerBar_LayerY_Bar7", "Ampl_PerBar_LayerY_Bar7", 200, -0.2, 1.2);
+  Ampl_PerBar_LayerY_Bar9 = new TH1D("Ampl_PerBar_LayerY_Bar9", "Ampl_PerBar_LayerY_Bar9", 200, -0.2, 1.2);
+
+  hHits_X = new TH1D("Hits_LayerX", "Number of Hits LayerX", 100, 0, 10);
+  hHits_Y = new TH1D("Hits_LayerY", "Number of Hits LayerY", 100, 0, 10);
+  h_nValidHits_X = new TH1D("nValidHits_LayerX", "Number of Valid Hits LayerX", 100, 0, 10);
+  h_nValidHits_Y = new TH1D("nValidHits_LayerY", "Number of Valid Hits LayerY", 100, 0, 10);
 
   for (int ilay = 0; ilay < kLayers; ilay++)
   {
@@ -463,13 +563,26 @@ void BookHistograms()
 
     for (int ibar = 0; ibar < (int)nBarsPerLayer; ibar++)
     {
-      // dE_vs_tof_perBar[ilay][ibar] = new TH2D(Form("dE_vs_tof_%s_bar%d",LayerName[(TLayer)ilay].data(),ibar),Form("dE_vs_tof_%s_bar%d",LayerName[(TLayer)ilay].data(),ibar),25000,5.,30.,1200,0.,120.);  // 1~ps/bin - 0.1 MeV/bin
-      ChargeA_perBar[ilay][ibar] = new TH1D(Form("Charge_ChA_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Charge_ChA_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 120, -2., 20.);
-      ChargeB_perBar[ilay][ibar] = new TH1D(Form("Charge_ChB_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Charge_ChB_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 120, -2., 20.);
-      Charge_perBar[ilay][ibar] = new TH1D(Form("Charge_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Charge_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 120, -2., 20.);
-      TimeA_perBar[ilay][ibar] = new TH1D(Form("Time_ChA_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Time_ChA_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 150, -100., 400.);
-      TimeB_perBar[ilay][ibar] = new TH1D(Form("Time_ChB_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Time_ChB_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 150, -100., 400.);
-      Time_perBar[ilay][ibar] = new TH1D(Form("Time_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Time_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 150, -100., 400.);
+      Charge_perBar[ilay][ibar] = new TH1D(Form("Charge_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Charge %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 120, -2., 20.);
+      Charge_perBar_noCuts[ilay][ibar] = new TH1D(Form("noCuts_Charge_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("No Cuts Charge %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 120, -2., 20.);
+      hToF[ilay][ibar] = new TH1D(Form("ToF_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("ToF %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 220, 6., 20.);
+      hToF_noCuts[ilay][ibar] = new TH1D(Form("noCuts_ToF_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("No cuts ToF %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 220, 6., 20.);
+      if (ilay == (Int_t)LayerX)
+      {
+        Charge_perBar[ilay][ibar]->SetDirectory(DirChargeTimeLayerX);
+        Charge_perBar_noCuts[ilay][ibar]->SetDirectory(DirChargeTimeLayerX);
+        // Time_perBar[ilay][ibar]->SetDirectory(DirChargeTimeLayerX);
+        hToF[ilay][ibar]->SetDirectory(DirToFLayerX);
+        hToF_noCuts[ilay][ibar]->SetDirectory(DirToFLayerX);
+      }
+      else
+      {
+        Charge_perBar[ilay][ibar]->SetDirectory(DirChargeTimeLayerY);
+        Charge_perBar_noCuts[ilay][ibar]->SetDirectory(DirChargeTimeLayerY);
+        // Time_perBar[ilay][ibar]->SetDirectory(DirChargeTimeLayerY);
+        hToF[ilay][ibar]->SetDirectory(DirToFLayerY);
+        hToF_noCuts[ilay][ibar]->SetDirectory(DirToFLayerY);
+      }
     }
     if (ilay == (Int_t)LayerX)
       hTwPos[ilay] = new TH2D(Form("hTwPos_%s", LayerName[(TLayer)ilay].data()), Form("hTwPos_%s", LayerName[(TLayer)ilay].data()), 220, -22., 22., 20, -20., 20.); // 2 mm/bin - 2 cm/bin
@@ -477,7 +590,7 @@ void BookHistograms()
       hTwPos[ilay] = new TH2D(Form("hTwPos_%s", LayerName[(TLayer)ilay].data()), Form("hTwPos_%s", LayerName[(TLayer)ilay].data()), 20, -20., 20., 220, -22., 22.); // 2 cm/bin - 2 mm/bin
   }
 
-  heloss_all = new TH1D("Eloss_all", "Eloss_all", 1200, 0., 120.);
+  // heloss_all = new TH1D("Eloss_all", "Eloss_all", 1200, 0., 120.);
 
   hTwMapPos_TWpntBin = new TH2D("hTwMapPos_TWpntBin", "hTwMapPos_TWpntBin", 22, -22., 22., 22, -22., 22.); // 2 cm/bin - 2 cm/bin
   hTwMapPos_TWpnt = new TH2D("hTwMapPos_TWpnt", "hTwMapPos_TWpnt", 220, -22., 22., 220, -22., 22.);        // 2 mm/bin - 2 mm/bin

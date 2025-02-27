@@ -94,10 +94,13 @@ void AnalyzeTWFragMC(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_
 
   TFile *fout = new TFile(outfile.Data(), "RECREATE");
   fout->cd();
+  TDirectory *DirElossLayerX = fout->mkdir("ElossLayerX");
+  TDirectory *DirElossLayerY = fout->mkdir("ElossLayerY");
+  TDirectory *DirTofLayerX = fout->mkdir("TofLayerX");
+  TDirectory *DirTofLayerY = fout->mkdir("TofLayerY");
+  //fileBinTwCalib.open(Form("%s/calibTwInput_%s_run%d.dat", outDir.Data(), expName.Data(), runNumber), ios::out | ios::binary); // apre il file binario in SCRITTURA
 
-  fileBinTwCalib.open(Form("%s/calibTwInput_%s_run%d.dat", outDir.Data(), expName.Data(), runNumber), ios::out | ios::binary); // apre il file binario in SCRITTURA
-
-  BookHistograms();
+  BookHistograms(DirElossLayerX, DirElossLayerY, DirTofLayerX, DirTofLayerY);
 
   TVecPair vPairWrongZ;
   vPairWrongZ.clear();
@@ -120,6 +123,8 @@ void AnalyzeTWFragMC(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_
   gTAGroot.AddRequiredItem(fActReader);
 
   Int_t nentries = fActReader->NEvents();
+
+  Int_t energy = static_cast<Int_t>(parGeo->GetBeamPar().Energy * 1000);  // MeV/u
 
   printf("Max available number of Entries in this Tree is::%d\n\n", (int)nentries);
 
@@ -168,6 +173,7 @@ void AnalyzeTWFragMC(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_
     if (debug)
       cout << "trigID::" << trigID << " nMBplusVeto::" << nMBplusVETOcounts << " nVETO::" << nVETOcounts << " nMB::" << nMBcounts << " nSTcounts::" << nSTcounts << "  statusMB::" << statusMB << endl;
 
+    /**
     if (calibTw)
     {
       if (!IncludeMC)
@@ -175,11 +181,27 @@ void AnalyzeTWFragMC(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_
       else
         FillBinaryForTwCalib_MC(ev, nentries, runNumber);
     }
+    */
 
     Int_t nHitsX = twNtuHit->GetHitN((Int_t)LayerX);
     Int_t nHitsY = twNtuHit->GetHitN((Int_t)LayerY);
+
+    hHits_X->Fill(nHitsX);
+    hHits_Y->Fill(nHitsY);
+
+    Int_t nValidHitsX = 0;
+    Int_t nValidHitsY = 0;
+
+    // Track which hitY has already been counted
+    std::vector<bool> countedY(nHitsY, false);
+
     if (debug)
       cout << " TWhits X::" << nHitsX << " Y::" << nHitsY << endl;
+
+    // Indexes to select the valid hits and fill the histograms
+    // when there's 1 valid hit on both X and Y layers
+    Int_t hitNumber_X;
+    Int_t hitNumber_Y;
 
     for (int ihitX = 0; ihitX < nHitsX; ihitX++)
     {
@@ -187,6 +209,21 @@ void AnalyzeTWFragMC(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_
       TATWhit *hitX = twNtuHit->GetHit(ihitX, (Int_t)LayerX);
       Double_t posAlongX = hitX->GetPosition(); // it provides the X coordinate
       Double_t posBarY = twparGeo->GetBarPosition((Int_t)LayerX, hitX->GetBar())[1];
+      Double_t elossX = hitX->GetAmplitudeChA();
+      Int_t barX = hitX->GetBar();
+
+      // if ((energy == 100 && elossX > 1.5 && elossX < 13.) ||
+      //     (energy == 140 && elossX > 1.1 && elossX < 11.) ||
+      //     (energy == 200 && elossX > 0.9 && elossX < 9.) ||
+      //     (energy == 220 && elossX > 0.8 && elossX < 8.5))
+      if ((energy == 100 && elossX > 1.5) ||
+          (energy == 140 && elossX > 1.1) ||
+          (energy == 200 && elossX > 0.9) ||
+          (energy == 220 && elossX > 0.8))    
+          {
+            nValidHitsX++;
+            hitNumber_X = ihitX;
+          }
 
       for (int ihitY = 0; ihitY < nHitsY; ihitY++)
       {
@@ -194,9 +231,17 @@ void AnalyzeTWFragMC(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_
         TATWhit *hitY = twNtuHit->GetHit(ihitY, (Int_t)LayerY);
         Double_t posAlongY = hitY->GetPosition(); // it provides the Y coordinate
         Double_t posBarX = twparGeo->GetBarPosition((Int_t)LayerY, hitY->GetBar())[0];
+        Double_t elossY = hitY->GetAmplitudeChA();
+        Int_t barY = hitY->GetBar();
 
-        if (hitX->GetEnergyLoss() < 0 || hitY->GetEnergyLoss() < 0)
-          continue;
+        if (!countedY[ihitY] && ((energy == 100 && elossY > 1.5) ||
+          (energy == 140 && elossY > 1.1) ||
+          (energy == 200 && elossY > 0.9) ||
+          (energy == 220 && elossY > 0.8))) {
+            nValidHitsY++;
+            countedY[ihitY] = true; // Mark this hitY as counted
+            hitNumber_Y = ihitY;
+          }
 
         hTwMapPos->Fill(posAlongX, posAlongY);
 
@@ -215,9 +260,38 @@ void AnalyzeTWFragMC(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_
       }
     }
 
+    hValidHits_X->Fill(nValidHitsX);
+    hValidHits_Y->Fill(nValidHitsY);
+
+    if (nValidHitsX == 1 && nValidHitsY == 1)
+    {
+      TATWhit *hitX = twNtuHit->GetHit(hitNumber_X, (Int_t)LayerX);
+      Int_t barX = hitX->GetBar();
+      Double_t elossX = hitX->GetAmplitudeChA();
+      Double_t tofX = hitX->GetToF();
+
+      TATWhit *hitY = twNtuHit->GetHit(hitNumber_Y, (Int_t)LayerY);
+      Int_t barY = hitY->GetBar();
+      Double_t elossY = hitY->GetAmplitudeChA();
+      Double_t tofY = hitY->GetToF();
+
+      if (ev % 10000 == 0) {
+        cout << "1 hit in each layer" << endl;
+        cout << "Energy [MeV/u]: " << energy << " elossX: " << elossX << " elossY: " << elossY << endl;
+      }
+
+      eloss_true_perBar[(Int_t)LayerX][barX]->Fill(elossX);
+      eloss_true_perBar[(Int_t)LayerY][barY]->Fill(elossY);
+      hToF[(Int_t)LayerX][barX]->Fill(tofX);
+      hToF[(Int_t)LayerY][barY]->Fill(tofY);
+
+      eloss_true_ch->Fill(elossX);
+      eloss_true_ch->Fill(elossY);
+
+    }
+
     if (nHitsX == 1 && nHitsY == 1)
     {
-
       TATWhit *hitX = twNtuHit->GetHit(0, (Int_t)LayerX);
       Double_t posAlongX = hitX->GetPosition(); // it provides the X coordinate
       Double_t posBarY = twparGeo->GetBarPosition((Int_t)LayerX, hitX->GetBar())[1];
@@ -231,6 +305,8 @@ void AnalyzeTWFragMC(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_
       hTwMapPos_1Cross->Fill(posAlongX, posAlongY);
     }
 
+
+
     Int_t nHits = twNtuHit->GetHitN();
     if (debug)
       cout << " TWhits::" << nHits << endl;
@@ -239,31 +315,37 @@ void AnalyzeTWFragMC(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_
     {
 
       TATWhit *hit = twNtuHit->GetHit(ihit);
-      if (!hit)
+      if (!hit || !hit->IsValid())
         continue;
 
       Int_t bar = hit->GetBar();
       Int_t layer = hit->GetLayer();
       Int_t NmcTrk = hit->GetMcTracksN();
-      Double_t eloss = hit->GetEnergyLoss();
+      Double_t eloss_ch = hit->GetAmplitudeChA();  // for MC it provides the true energy loss
       Double_t tof = hit->GetToF();
       Int_t Z = hit->GetChargeZ();
 
       if (debug)
-        printf("twhit::%d  %s  bar::%d  Z::%d  eloss::%f  NmcTrk::%d\n", ihit, LayerName[(TLayer)layer].data(), bar, Z, eloss, NmcTrk);
+        printf("twhit::%d  %s  bar::%d  Z::%d  eloss::%f  NmcTrk::%d\n", ihit, LayerName[(TLayer)layer].data(), bar, Z, eloss_ch, NmcTrk);
 
-      if (!calibTw)
-      {
-        dE_vs_tof_perBar[layer][bar]->Fill(tof, eloss);
-        dE_vs_tof[layer]->Fill(tof, eloss);
-        heloss_all->Fill(eloss);
-      }
+      dE_vs_tof_perBar[layer][bar]->Fill(tof, eloss_ch);
+      
+      noCuts_eloss_true_perBar[layer][bar]->Fill(eloss_ch);
+      noCuts_hToF[layer][bar]->Fill(tof);
+      eloss_true_nocuts->Fill(eloss_ch);
 
-      if (layer == (Int_t)LayerX && bar >= CentralBarsID[0] && bar <= CentralBarsID[2])
-      {
-        if (!IncludeMC)
-          mapTrigHisto[(TrigID)trigID]->Fill(eloss);
-      }
+      //dE_vs_tof_perBar[layer][bar]->Fill(tof, eloss_ch);
+      //dE_vs_tof[layer]->Fill(tof, eloss_ch);
+      //heloss_all->Fill(eloss_ch);
+
+      //eloss_true_ch->Fill(eloss_ch);
+      //hToF[layer][bar]->Fill(tof);
+
+      //if (layer == (Int_t)LayerX && bar >= CentralBarsID[0] && bar <= CentralBarsID[2])
+      //{
+      //  if (!IncludeMC)
+      //    mapTrigHisto[(TrigID)trigID]->Fill(eloss);
+      //}
 
       if (layer == (Int_t)LayerX)
       {
@@ -322,7 +404,7 @@ void AnalyzeTWFragMC(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_
     //   cout<<clusPos.X()<<"  "<<clusPos.Y()<<"  "<<clusPos.Z()<<endl;
 
     // }
-
+    /**
     int NtwPoints = twNtuPoint->GetPointsN();
     if (debug)
       cout << NtwPoints << " TW points" << endl;
@@ -379,11 +461,12 @@ void AnalyzeTWFragMC(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_
           hResY[Z - 1]->Fill(pointLocPos.Y() - hit->GetPosition());
       }
     }
+    */
 
   } // close for loop over events
 
   gTAGroot.EndEventLoop();
-
+  //eloss_true_ch->Add(eloss_true_X, eloss_true_Y);
   cout << endl
        << "Job Done!" << endl;
 
@@ -391,7 +474,7 @@ void AnalyzeTWFragMC(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_
   fout->Write();
   fout->Close();
 
-  fileBinTwCalib.close();
+  //fileBinTwCalib.close();
 
   if (readBinTwCalibFile)
   {
@@ -446,7 +529,7 @@ void InitializeContainers()
 
 //-----------------------------------------------------------------------------
 
-void BookHistograms()
+void BookHistograms(TDirectory *DirElossLayerX, TDirectory *DirElossLayerY, TDirectory *DirTofLayerX, TDirectory *DirTofLayerY)
 {
 
   // fpHisSeedMap = new TH1F(Form("msSeedMap%d", 4+1), Form("MSD - seed map for sensor %d", i+1), pGeoMap->GetStripsN(), 0, msdparGeo->GetStripsN());
@@ -455,13 +538,40 @@ void BookHistograms()
   // fpHisStripMap = new TH1F(Form("msStripMap%d", 4+1), Form("MSD - strip map for sensor %d", i+1), pGeoMap->GetStripsN(), 0, msdparGeo->GetStripsN());
   // AddHistogram(fpHisStripMap);
 
+  eloss_true_ch = new TH1D("Eloss_true_ch", "Eloss true MC ch", 120, -2., 20.);
+  eloss_true_nocuts = new TH1D("Eloss_true_ch_nocuts", "Eloss true MC ch no cuts", 120, -2., 20.);
+  //eloss_1hit_sum = new TH1D("Eloss_1hit_sum", "Eloss true MC 1 hit", 120, -2., 20.);
+
+  hHits_X = new TH1D("Hits_LayerX", "Number of Hits LayerX", 100, 0, 10);
+  hHits_Y = new TH1D("Hits_LayerY", "Number of Hits LayerY", 100, 0, 10);
+  hValidHits_X = new TH1D("nValidHits_LayerX", "Number of Valid Hits LayerX", 100, 0, 10);
+  hValidHits_Y = new TH1D("nValidHits_LayerY", "Number of Valid Hits LayerY", 100, 0, 10);
+
   for (int ilay = 0; ilay < kLayers; ilay++)
   {
-
-    dE_vs_tof[ilay] = new TH2D(Form("dE_vs_tof_%s", LayerName[(TLayer)ilay].data()), Form("dE_vs_tof_%s", LayerName[(TLayer)ilay].data()), 25000, 5., 30., 1200, 0., 120.); // 1~ps/bin - 0.1 MeV/bin
-
     for (int ibar = 0; ibar < (int)nBarsPerLayer; ibar++)
-      dE_vs_tof_perBar[ilay][ibar] = new TH2D(Form("dE_vs_tof_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("dE_vs_tof_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 25000, 5., 30., 1200, 0., 120.); // 1~ps/bin - 0.1 MeV/bin
+    {
+      //eloss_true_MC[ilay][ibar] = new TH1D(Form("Eloss_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Eloss true MC %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 120, -2., 20.);
+      hToF[ilay][ibar] = new TH1D(Form("ToF_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("ToF %s bar %d", LayerName[(TLayer)ilay].data(), ibar), 140, 6., 20.);
+      noCuts_hToF[ilay][ibar] = new TH1D(Form("noCuts_ToF_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("No cuts ToF %s bar %d", LayerName[(TLayer)ilay].data(), ibar), 140, 6., 20.);
+      eloss_true_perBar[ilay][ibar] = new TH1D(Form("Eloss_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Eloss true MC %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 120, -2., 20.);
+      noCuts_eloss_true_perBar[ilay][ibar] = new TH1D(Form("noCuts_Eloss_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("No cuts Eloss true MC %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 120, -2., 20.);
+      if (ilay == (Int_t)LayerX) {
+        hToF[ilay][ibar]->SetDirectory(DirTofLayerX);
+        eloss_true_perBar[ilay][ibar]->SetDirectory(DirElossLayerX);
+        noCuts_eloss_true_perBar[ilay][ibar]->SetDirectory(DirElossLayerX);
+        noCuts_hToF[ilay][ibar]->SetDirectory(DirTofLayerX);
+      }
+      else {
+        hToF[ilay][ibar]->SetDirectory(DirTofLayerY);
+        eloss_true_perBar[ilay][ibar]->SetDirectory(DirElossLayerY);
+        noCuts_eloss_true_perBar[ilay][ibar]->SetDirectory(DirElossLayerY);
+        noCuts_hToF[ilay][ibar]->SetDirectory(DirTofLayerY);
+      }
+
+      dE_vs_tof_perBar[ilay][ibar] = new TH2D(Form("dE_vs_tof_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("dE_vs_tof_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), 2500, 5., 30., 20, 0., 2.); // 10~ps/bin - 0.1 MeV/bin
+    }
+    //dE_vs_tof[ilay] = new TH2D(Form("dE_vs_tof_%s", LayerName[(TLayer)ilay].data()), Form("dE_vs_tof_%s", LayerName[(TLayer)ilay].data()), 25000, 5., 30., 1200, 0., 120.); // 1~ps/bin - 0.1 MeV/bin
 
     if (ilay == (Int_t)LayerX)
       hTwPos[ilay] = new TH2D(Form("hTwPos_%s", LayerName[(TLayer)ilay].data()), Form("hTwPos_%s", LayerName[(TLayer)ilay].data()), 220, -22., 22., 20, -20., 20.); // 2 mm/bin - 2 cm/bin
@@ -469,7 +579,7 @@ void BookHistograms()
       hTwPos[ilay] = new TH2D(Form("hTwPos_%s", LayerName[(TLayer)ilay].data()), Form("hTwPos_%s", LayerName[(TLayer)ilay].data()), 20, -20., 20., 220, -22., 22.); // 2 cm/bin - 2 mm/bin
   }
 
-  heloss_all = new TH1D("Eloss_all", "Eloss_all", 1200, 0., 120.);
+  //heloss_all = new TH1D("Eloss_all", "Eloss_all", 1200, 0., 120.);
 
   for (auto itr = mapTrig.begin(); itr != mapTrig.end(); ++itr)
   {

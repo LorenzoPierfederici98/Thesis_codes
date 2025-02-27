@@ -152,9 +152,9 @@ static int  IncludeDAQ;
 static int  IncludeWD;
 
 Bool_t debug              = false;
-Bool_t calibTw            = true;  // true form MC
+Bool_t calibTw            = true;  // true for MC
 Bool_t isTwScan           = true;
-Bool_t readBinTwCalibFile = true;
+Bool_t readBinTwCalibFile = false;
 
 enum{kCharges=8,kLayers=2,kBars=20};
 // enum{kCharges=8,kLayers=2,kCentralBars=3};
@@ -186,8 +186,17 @@ typedef std::vector<std::pair<Int_t,Int_t> > TVecPair;
 
 TH2D *dE_vs_tof[kLayers];
 TH2D *dE_vs_tof_perBar[kLayers][nBarsPerLayer];
-// TH2D *dE_vs_tof_perBar[kLayers][kBars];
 TH1D *heloss_all;
+TH1D *eloss_true_nocuts;
+TH1D *eloss_true_ch;
+TH1D *eloss_true_perBar[kLayers][nBarsPerLayer];
+TH1D *noCuts_eloss_true_perBar[kLayers][nBarsPerLayer];
+TH1D *hToF[kLayers][nBarsPerLayer];
+TH1D *noCuts_hToF[kLayers][nBarsPerLayer];
+TH1D *hHits_X;
+TH1D *hHits_Y;
+TH1D *hValidHits_X;
+TH1D *hValidHits_Y;
 // TH1D *heloss[kTrigsN];;
 TH2D *hTwPos[kLayers];
 TH2D *hTwMapPos;
@@ -202,7 +211,7 @@ TH1D *hResY_1Cross;
 
 
 void  InitializeContainers();
-void  BookHistograms();
+void  BookHistograms(TDirectory *DirElossLayerX, TDirectory *DirElossLayerY, TDirectory *DirToFLayerX, TDirectory *DirToFLayerY);
 void  GetFOOTgeo(TAGcampaignManager* camp_manager, Int_t run_number);
 void  GetRunAndGeoInfo( TAGcampaignManager* campManager, Int_t runNumber);
 void  SetTreeBranchAddress(TAGactTreeReader *treeReader);

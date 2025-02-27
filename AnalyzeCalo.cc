@@ -206,21 +206,21 @@ void AnalyzeCalo(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t ne
       Double_t charge_calo = hit_ca->GetCharge();
       Int_t ModuleID = crystal_id / kCrysPerModule;
       TVector3 CaloPosition = hit_ca->GetPosition();
+      
+      if (charge_calo > 0.02) {
+        Charge_Calo_total->Fill(charge_calo);
+        Charge_Calo_crystal[crystal_id]->Fill(charge_calo);
+        //Charge_Calo_Module[ModuleID]->Fill(charge_calo);
 
-      Charge_Calo_total->Fill(charge_calo);
-      Charge_Calo_total->GetXaxis()->SetRangeUser(Charge_Calo_total->GetBinLowEdge(Charge_Calo_total->FindFirstBinAbove()), 
-                                Charge_Calo_total->GetBinLowEdge(Charge_Calo_total->FindLastBinAbove() + 1));
-      Charge_Calo_crystal[crystal_id]->Fill(charge_calo);
-      Charge_Calo_Module[ModuleID]->Fill(charge_calo);
-
-      // Fill the histogram with the usual values (e.g., charge)
-      hCalMapPos[ModuleID]->Fill(CaloPosition.X(), CaloPosition.Y());
-      double valueToSet = (crystal_id == 0) ? 0.0001 : static_cast<double>(crystal_id);
-      hCalMapCrystalID[ModuleID]->SetBinContent(
-        hCalMapCrystalID[ModuleID]->GetXaxis()->FindBin(CaloPosition.X()),
-        hCalMapCrystalID[ModuleID]->GetYaxis()->FindBin(CaloPosition.Y()),
-        valueToSet
-      );
+        // Fill the histogram with the usual values (e.g., charge)
+        hCalMapPos[ModuleID]->Fill(CaloPosition.X(), CaloPosition.Y());
+        double valueToSet = (crystal_id == 0) ? 0.0001 : static_cast<double>(crystal_id);
+        hCalMapCrystalID[ModuleID]->SetBinContent(
+          hCalMapCrystalID[ModuleID]->GetXaxis()->FindBin(CaloPosition.X()),
+          hCalMapCrystalID[ModuleID]->GetYaxis()->FindBin(CaloPosition.Y()),
+          valueToSet
+        );
+      }
     }
 
     Int_t nClusters = caNtuClus->GetClustersN();  // number of clusters
@@ -249,13 +249,23 @@ void AnalyzeCalo(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t ne
           continue;
         //TVector3 ClusterHitPos = hit->GetPosition();
         Int_t crystal_id = hit->GetCrystalId();
-        Double_t charge_cluster = hit->GetCharge();
+        Double_t charge_clusterHit = hit->GetCharge();
+        Double_t ratio;
+        // ratio corresponds to the crystal charge for fragmentation runs
+        // and to the normalized charge for non-fragmentation runs
+        if (!fragm) {
+          ratio = charge_clusterHit;
+        }
+        else {
+          ratio = charge_clusterHit/charge_cluster_total;
+        }
         //if (crystal_id == 0) scatterPlot->SetPoint(pointIndex++, charge_cluster, nClusterHits);
-        if (crystal_id == 0 || crystal_id == 1)
-          Charge_Calo_crystal_cluster[crystal_id]->Fill(charge_cluster / charge_cluster_total);
-        hClusterSize_Charge[crystal_id]->Fill(charge_cluster / charge_cluster_total, nClusterHits);
-        //Charge_Cluster_crystal[icluster][crystal_id]->Fill(charge_cluster);
-        //hCalClusterPos[icluster]->Fill(ClusterHitPos.X(), ClusterHitPos.Y());
+        if (ratio > 0.02) {
+          ClusterCharge_Calo_crystal[crystal_id]->Fill(ratio);
+          hClusterSize_Charge[crystal_id]->Fill(ratio, nClusterHits);
+          //Charge_Cluster_crystal[icluster][crystal_id]->Fill(charge_cluster);
+          //hCalClusterPos[icluster]->Fill(ClusterHitPos.X(), ClusterHitPos.Y());
+        }
       }
     }
 
@@ -303,24 +313,23 @@ void BookHistograms()
   // AddHistogram(fpHisStripMap);
   int modules[7] = {4, 5, 3, 6, 2, 7, 1};  // module enumeration following the excel file
 
-  Charge_Calo_total = new TH1D(Form("Charge_Calo"), Form("Charge_Calo"), 500, 0., 1.5);
+  Charge_Calo_total = new TH1D(Form("Charge_Calo"), Form("Charge_Calo"), 500, -0.2, 1.5);
 
-  Clusters_number = new TH1D(Form("Clusters_number"), Form("Clusters_number"), 100, -1., 5.);
+  Clusters_number = new TH1D(Form("Clusters_number"), Form("Clusters number"), 100, -1., 5.);
   Clusters_size = new TH1D(Form("Clusters_size"), Form("Clusters_size"), 100, -1., 20.);
 
   for(int icrystal=0; icrystal < kModules*kCrysPerModule; icrystal++)
   {
-    Charge_Calo_crystal[icrystal] = new TH1D(Form("Charge_Calo_crystalId_%d", icrystal), Form("Charge_Calo_crystalID_%d", icrystal), 500, -0.2, 2.);
+    Charge_Calo_crystal[icrystal] = new TH1D(Form("Charge_Calo_crystalId_%d", icrystal), Form("Charge_Calo_crystalID_%d", icrystal), 500, -0.2, 1.);
 
-    hClusterSize_Charge[icrystal] = new TH2D(Form("ClusterSize_Charge_crystalId_%d", icrystal), Form("ClusterSize_Charge_crystalId_%d", icrystal), 200, 0., 1., 30, 0.5, 6.5);
-    if (icrystal == 0 || icrystal == 1)
-      Charge_Calo_crystal_cluster[icrystal] = new TH1D(Form("Charge_Calo_crystalId_%d_cluster", icrystal), Form("Charge_Calo_crystalID_%d_cluster", icrystal), 500, 0., 1.);
+    hClusterSize_Charge[icrystal] = new TH2D(Form("ClusterSize_Charge_crystalId_%d", icrystal), Form("Cluster-Size vs Charge crystalId %d", icrystal), 100, -0.2, 1.1, 30, 0.5, 6.5);
+    ClusterCharge_Calo_crystal[icrystal] = new TH1D(Form("ClusterCharge_Calo_crystalId_%d", icrystal), Form("Cluster Charge crystalID %d", icrystal), 500, -0.2, 1.1);
   }
   for(int imodule=0; imodule < kModules; imodule++)
   {
     hCalMapPos[imodule] = new TH2D(Form("hCalMapPos_module_%d", modules[imodule]), Form("hCalMapPos_module_%d", modules[imodule]), 27, -27., 27., 11, -11., 11.);
     hCalMapCrystalID[imodule] = new TH2D(Form("hCalMapCrystalID_module_%d", modules[imodule]), Form("hCalMapCrystalID_module_%d", modules[imodule]), 27, -27., 27., 11, -11., 11.);
-    Charge_Calo_Module[imodule] = new TH1D(Form("Charge_Calo_Module_%d", modules[imodule]), Form("Charge_Calo_Module_%d", modules[imodule]), 200, 0., 1.);
+    //Charge_Calo_Module[imodule] = new TH1D(Form("Charge_Calo_Module_%d", modules[imodule]), Form("Charge_Calo_Module_%d", modules[imodule]), 200, 0., 1.);
   }
 
 

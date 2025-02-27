@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <TCanvas.h>
 #include <fstream>
 #include <iostream>
 #include <iomanip>
@@ -20,9 +21,7 @@
 #include <TH1.h>
 #include <TROOT.h>
 #include <TKey.h>
-#include <TCanvas.h>
 #include <TLatex.h>
-#include <TDirectory.h>
 
 #include "TAGcampaignManager.hxx"
 #include "TAGactTreeReader.hxx"
@@ -163,6 +162,7 @@ Bool_t readBinTwCalibFile = false;
 enum{kCharges=8,kLayers=2,kBars=20};  //TW
 enum{kModules=7, kCrysPerModule=9};  //Calorimeter
 // enum{kCharges=8,kLayers=2,kCentralBars=3};
+enum{max_cluster_number=10};
 enum{kVTreg=2,kTWreg=4};
 enum FlukaVar {kPrimaryID=0,kNeutronFlukaId=8};
 enum TrigID {kTrigsN=4,kMBplusVeto=0,kVeto=1,kMB=40,kSTtrig=42};
@@ -189,55 +189,27 @@ typedef std::vector<std::pair<Int_t,Int_t> > TVecPair;
 // TH1F*           fpHisSeedMap[MaxPlane];    ///< seed map
 // TH1F*           fpHisStripMap[MaxPlane];   ///< strip map
 
-TH2D *dE_vs_tof[kLayers];
-TH2D *dE_vs_tof_perBar[kLayers][nBarsPerLayer];
-TH1D *Charge_perBar[kLayers][nBarsPerLayer];  //sqrt(QA*QB)
-TH1D *Charge_perBar_noCuts[kLayers][nBarsPerLayer];
-TH1D *Time_perBar[kLayers][nBarsPerLayer];  //0.5*(TA + TB)
-TH1D *hToF[kLayers][nBarsPerLayer];
-TH1D *hToF_noCuts[kLayers][nBarsPerLayer];
-TH1D *Ampl_PerBar_LayerX_Bar9;
-TH1D *Ampl_PerBar_LayerX_Bar7;
-TH1D *Ampl_PerBar_LayerY_Bar9;
-TH1D *Ampl_PerBar_LayerY_Bar7;
-TH1D *PosX;  //bar hit position in layerX
-TH1D *PosY;  //bar hit position in layerY
-TH1D *Bar_ID_X;  //bar ID for a given layer
-TH1D *Bar_ID_Y;
-TH1D *PosX_Bar9;
-TH1D *PosY_Bar9;
-TH1D *hHits_X;
-TH1D *h_nValidHits_X;
-TH1D *h_nValidHits_Y;
-TH1D *hHits_Y;
+TH1D *Charge_Calo_total;  //charge in all calo
+//TH1D *Charge_Calo_Module[kModules];  //charge per module in calo
+TH1D *Charge_Calo_crystal[kModules * kCrysPerModule];  //charge per crystal id in calo
+TH1D *ClusterCharge_Calo_crystal[kModules * kCrysPerModule];
 
-// TH2D *dE_vs_tof_perBar[kLayers][kBars];
-TH1D *heloss_all;
-// TH1D *heloss[kTrigsN];;
-TH2D *hTwPos[kLayers];
-TH2D *hTwMapPos;
-TH2D *hTwMapPos_Bar9;
-TH2D *hTwMapPos_TWpntBin;
-TH2D *hTwMapPos_TWpnt;
-TH2D *hTwMapPos_TWpnt_Z[kCharges];
-TH1D *hResX[kCharges];
-TH1D *hResY[kCharges];
-TH2D *hTwMapPos_1Cross;
-TH1D *hResX_1Cross;
-TH1D *hResY_1Cross;
-TH2D *hBarID_1Cross;
-TH2D *Charge_vs_tof;
+TH1D *Clusters_size;
+TH1D *Clusters_size_noCuts;
+TH1D *Clusters_number;
+TH2D *hClusterSize_Charge[kModules * kCrysPerModule];
+TH2D *Correlated_ClusterCharge[kCrysPerModule][kCrysPerModule];
+//TH2D *hCalClusterPos[max_cluster_number];
 
+TH2D *hCalMapPos[kModules];  //2D histogram of x, y positions in the calorimeter
+TH2D *hCalMapCrystalID[kModules];  //2D histogram of crystalID in modules
 
 void  InitializeContainers();
-void  BookHistograms(TDirectory* DirChargeTimeLayerX, TDirectory* DirChargeTimeLayerY, 
-                    TDirectory* DirToFLayerX, TDirectory* DirToFLayerY);
+void  BookHistograms();
 void  GetFOOTgeo(TAGcampaignManager* camp_manager, Int_t run_number);
-void  GetRunAndGeoInfo(TAGcampaignManager* campManager, Int_t runNumber);
+void  GetRunAndGeoInfo( TAGcampaignManager* campManager, Int_t runNumber);
 void  SetTreeBranchAddress(TAGactTreeReader *treeReader);
 void  ProjectTracksOnTw(int Z, TVector3 init_pos, TVector3 init_p);
-void  LoopOverMCtracks(Int_t Emin, Int_t Emax, Bool_t isnotrig);
-void  AdjustHistoRange(TH1D *Histo);
 
 Bool_t IsVTregion(int reg);
 
@@ -247,4 +219,4 @@ inline Int_t GetZbeam() {return parGeo->GetBeamPar().AtomicNumber;}
 // TW center in global ref frame
 inline TVector3 GetTwCenter() {return geoTrafo->GetTWCenter();}   
 // TW theta angle geometrical acceptance
-inline Double_t GetMaxAngle() {return TMath::ATan(((nBarsPerLayer*twparGeo->GetBarWidth())/2-TMath::Abs(GetTwCenter().y())-maxTGy)/GetTwCenter().z()); } // rad   
+inline Double_t GetMaxAngle() {return TMath::ATan(((nBarsPerLayer*twparGeo->GetBarWidth())/2-TMath::Abs(GetTwCenter().y())-maxTGy)/GetTwCenter().z()); } // rad
