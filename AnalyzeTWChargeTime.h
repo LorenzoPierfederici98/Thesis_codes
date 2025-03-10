@@ -189,17 +189,14 @@ typedef std::vector<std::pair<Int_t,Int_t> > TVecPair;
 // TH1F*           fpHisSeedMap[MaxPlane];    ///< seed map
 // TH1F*           fpHisStripMap[MaxPlane];   ///< strip map
 
-TH2D *dE_vs_tof[kLayers];
-TH2D *dE_vs_tof_perBar[kLayers][nBarsPerLayer];
+//TH2D *dE_vs_tof[kLayers];
+//TH2D *dE_vs_tof_perBar[kLayers][nBarsPerLayer];
 TH1D *Charge_perBar[kLayers][nBarsPerLayer];  //sqrt(QA*QB)
 TH1D *Charge_perBar_noCuts[kLayers][nBarsPerLayer];
-TH1D *Time_perBar[kLayers][nBarsPerLayer];  //0.5*(TA + TB)
+//TH1D *Time_perBar[kLayers][nBarsPerLayer];  //0.5*(TA + TB)
 TH1D *hToF[kLayers][nBarsPerLayer];
 TH1D *hToF_noCuts[kLayers][nBarsPerLayer];
-TH1D *Ampl_PerBar_LayerX_Bar9;
-TH1D *Ampl_PerBar_LayerX_Bar7;
-TH1D *Ampl_PerBar_LayerY_Bar9;
-TH1D *Ampl_PerBar_LayerY_Bar7;
+
 TH1D *PosX;  //bar hit position in layerX
 TH1D *PosY;  //bar hit position in layerY
 TH1D *Bar_ID_X;  //bar ID for a given layer
@@ -226,7 +223,7 @@ TH2D *hTwMapPos_1Cross;
 TH1D *hResX_1Cross;
 TH1D *hResY_1Cross;
 TH2D *hBarID_1Cross;
-TH2D *Charge_vs_tof;
+//TH2D *Charge_vs_tof;
 
 
 void  InitializeContainers();
@@ -238,6 +235,7 @@ void  SetTreeBranchAddress(TAGactTreeReader *treeReader);
 void  ProjectTracksOnTw(int Z, TVector3 init_pos, TVector3 init_p);
 void  LoopOverMCtracks(Int_t Emin, Int_t Emax, Bool_t isnotrig);
 void  AdjustHistoRange(TH1D *Histo);
+void SetTitleAndLabels(TObject* obj, const char* title, const char* xLabel, const char* yLabel);
 
 Bool_t IsVTregion(int reg);
 

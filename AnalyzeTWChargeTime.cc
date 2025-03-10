@@ -168,15 +168,121 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
   objString.Write(Form("BeamEnergyInfo run %d", runNumber));
   materialObj.Write(Form("IonInfo run %d", runNumber));
   nentriesObj.Write(Form("nentries run %d", runNumber));
-  // Loop over the TTree
-  gTAGroot.BeginEventLoop();
-  int pointIndex_9 = 0;
-  int pointIndex_7 = 0;
+
   TCanvas *c = new TCanvas("c", "Scatter Plot", 800, 600);
-  TGraph *scatterPlot_bar9 = new TGraph();
-  TGraph *scatterPlot_bar7 = new TGraph();
+  TGraph *scatterPlot_bar9_layerX = new TGraph();
+  TGraph *scatterPlot_bar9_layerY = new TGraph();
+  TGraph *scatterPlot_bar9_layerX_filtered = new TGraph();
+  TGraph *scatterPlot_bar9_layerY_filtered = new TGraph();
+  Int_t pointIndex_bar9_layerX = 0;
+  Int_t pointIndex_bar9_layerY = 0;
+  Int_t pointIndex_bar9_layerX_filtered = 0;
+  Int_t pointIndex_bar9_layerY_filtered = 0;
+
   Int_t energy = std::stoi(beamEnergyStr);
   Int_t ev = -1;
+
+  // Loop over the TTree to build the ampl-charge scatterplot
+  // to be fitted with a linear function, to discard the pileup hits
+  // which are far from the charge-ampl fit line
+  gTAGroot.BeginEventLoop();
+  
+  while (gTAGroot.NextEvent() && ev != nentries)
+  {
+    ev++;
+    Int_t nHitsX = twNtuHit->GetHitN((Int_t)LayerX);
+    Int_t nHitsY = twNtuHit->GetHitN((Int_t)LayerY);
+
+    if (debug)
+      cout << " TWhits X::" << nHitsX << " Y::" << nHitsY << endl;
+
+    for (int ihitX = 0; ihitX < nHitsX; ihitX++)
+    {
+      TATWhit *hitX = twNtuHit->GetHit(ihitX, (Int_t)LayerX);
+      Double_t barX = hitX->GetBar();
+      Double_t QAX = hitX->GetChargeChA();
+      Double_t QBX = hitX->GetChargeChB();
+      Double_t QBarX = sqrt(QAX * QBX);
+      Double_t amplAX = hitX->GetAmplitudeChA();
+      Double_t amplBX = hitX->GetAmplitudeChB();
+      Double_t amplX = sqrt(amplAX * amplBX);
+      if (barX == 9)
+      {
+        scatterPlot_bar9_layerX->SetPoint(pointIndex_bar9_layerX++, amplX, QBarX);
+      }
+    }
+    for (int ihitY = 0; ihitY < nHitsY; ihitY++)
+    {
+      TATWhit *hitY = twNtuHit->GetHit(ihitY, (Int_t)LayerY);
+      Double_t barY = hitY->GetBar();
+      Double_t QAY = hitY->GetChargeChA();
+      Double_t QBY = hitY->GetChargeChB();
+      Double_t QBarY = sqrt(QAY * QBY);
+      Double_t amplAY = hitY->GetAmplitudeChA();
+      Double_t amplBY = hitY->GetAmplitudeChB();
+      Double_t amplY = sqrt(amplAY * amplBY);
+      if (barY == 9)
+      {
+        scatterPlot_bar9_layerY->SetPoint(pointIndex_bar9_layerY++, amplY, QBarY);
+      }
+    }
+  }
+
+  gTAGroot.EndEventLoop();
+
+  cout << "Ended first event loop" << endl;
+
+  int nPointsX = scatterPlot_bar9_layerX->GetN();
+  int nPointsY = scatterPlot_bar9_layerY->GetN();
+
+  if (nPointsX == 0 || nPointsY == 0) {
+      std::cerr << "Error: No points in scatter plots!" << std::endl;
+  }
+
+  // Linear regression to the scatter plots charge-ampl of bars 9 of
+  // each layer
+
+  TF1 *fitFunc_layerX = new TF1("fitFunc_layerX", "[0]*x", 0., 0.99);
+  TF1 *fitFunc_layerY = new TF1("fitFunc_layerY", "[0]*x", 0., 0.99);
+
+  fitFunc_layerX->SetParameter(0, 35.);
+  fitFunc_layerY->SetParameter(0, 35.);
+
+  TFitResultPtr fitX = scatterPlot_bar9_layerX->Fit(fitFunc_layerX, "SQROBR");
+  TFitResultPtr fitY = scatterPlot_bar9_layerY->Fit(fitFunc_layerY, "SQROBR");
+
+  Double_t slopeX = fitFunc_layerX->GetParameter(0);
+  Double_t slopeY = fitFunc_layerY->GetParameter(0);
+
+  cout << "slopeX: " << slopeX << " slopeY: " << slopeY << endl;
+
+  if (fitX->IsValid() && !fitY->IsValid())
+  {
+    cout << "fit layerY failed, setting slopeY = slopeX" << endl;
+    slopeY = slopeX;
+  }
+  else if (fitY->IsValid() && !fitX->IsValid())
+  {
+    cout << "fit layerX failed, setting slopeX = slopeY" << endl;
+    slopeX = slopeY;
+  }
+  else if (!fitX->IsValid() && !fitY->IsValid())
+  {
+    cout << "both fit failed, setting slopes to 33." << endl;
+    slopeX = 33.;
+    slopeY = 33.;
+  }
+
+  // needed for the second loop
+  fActReader->Open(infile);
+  gTAGroot.AddRequiredItem(fActReader);
+  ev = -1;
+
+  // Second loop to build the charge-eloss histograms selecting events
+  // with 1 valid hit (defined with a threshold on charge values) on both
+  // layers and discarding pileup events (charge > charge_threshold from the fit line)
+  gTAGroot.BeginEventLoop();
+
   while (gTAGroot.NextEvent() && ev != nentries)
   {
 
@@ -223,6 +329,8 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
     Int_t hitNumber_X;
     Int_t hitNumber_Y;
 
+    Double_t charge_threshold = 0.7;
+
     for (int ihitX = 0; ihitX < nHitsX; ihitX++)
     {
 
@@ -230,25 +338,26 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
       Double_t posAlongX = hitX->GetPosition(); // it provides the X coordinate
       Double_t posBarY = twparGeo->GetBarPosition((Int_t)LayerX, hitX->GetBar())[1];
       Double_t barX = hitX->GetBar();
+      Double_t amplAX = hitX->GetAmplitudeChA();
+      Double_t amplBX = hitX->GetAmplitudeChB();
+      Double_t amplX = sqrt(amplAX * amplBX);
       Double_t QAX = hitX->GetChargeChA();
       Double_t QBX = hitX->GetChargeChB();
       Double_t QBarX = sqrt(QAX * QBX);
+      Double_t expected_chargeX = slopeX * amplX;
 
-      // if ((energy == 100 && QBarX > 1. && QBarX < 15.) ||
-      //     (energy == 140 && QBarX > 1. && QBarX < 12.) ||
-      //     (energy == 200 && QBarX > 1. && QBarX < 9.) ||
-      //     (energy == 220 && QBarX > 0.85 && QBarX < 8.5))
-      if (hitX->IsValid() && ((energy == 100 && QBarX > 1.) ||
+      if (hitX->IsValid() && (barX != 9 || (barX == 9 && (fabs(QBarX - expected_chargeX) < charge_threshold))) && ((energy == 100 && QBarX > 1.) ||
           (energy == 140 && QBarX > 0.95) ||
           (energy == 200 && QBarX > 0.8) ||
           (energy == 220 && QBarX > 0.7)))
       {
         nValidHitsX++;
         hitNumber_X = ihitX;
+        if (barX == 9)
+        {
+          scatterPlot_bar9_layerX_filtered->SetPoint(pointIndex_bar9_layerX_filtered++, amplX, QBarX);
+        }
       }
-
-      //Bar_ID_X->Fill(barX);
-      PosX->Fill(posAlongX);
 
       for (int ihitY = 0; ihitY < nHitsY; ihitY++)
       {
@@ -257,16 +366,15 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
         Double_t posAlongY = hitY->GetPosition(); // it provides the Y coordinate
         Double_t posBarX = twparGeo->GetBarPosition((Int_t)LayerY, hitY->GetBar())[0];
         Double_t barY = hitY->GetBar();
+        Double_t amplAY = hitY->GetAmplitudeChA();
+        Double_t amplBY = hitY->GetAmplitudeChB();
+        Double_t amplY = sqrt(amplAY * amplBY);
         Double_t QAY = hitY->GetChargeChA();
         Double_t QBY = hitY->GetChargeChB();
         Double_t QBarY = sqrt(QAY * QBY);
+        Double_t expected_chargeY = slopeY * amplY;
 
-        // if (!countedY[ihitY] &&
-        //     ((energy == 100 && QBarY > 1. && QBarY < 15.) ||
-        //      (energy == 140 && QBarY > 1. && QBarY < 12.) ||
-        //      (energy == 200 && QBarY > 1. && QBarY < 9.) ||
-        //      (energy == 220 && QBarY > 0.85 && QBarY < 8.5)))
-        if (hitY->IsValid() && !countedY[ihitY] && ((energy == 100 && QBarY > 1.) ||
+        if (hitY->IsValid() && !countedY[ihitY] && (barY != 9 || (barY == 9 && (fabs(QBarY - expected_chargeY) < charge_threshold))) && ((energy == 100 && QBarY > 1.) ||
           (energy == 140 && QBarY > 0.95) ||
           (energy == 200 && QBarY > 0.8) ||
           (energy == 220 && QBarY > 0.7)))
@@ -274,11 +382,11 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
           nValidHitsY++;
           countedY[ihitY] = true; // Mark this hitY as counted
           hitNumber_Y = ihitY;
+          if (barY == 9)
+          {
+            scatterPlot_bar9_layerY_filtered->SetPoint(pointIndex_bar9_layerY_filtered++, amplY, QBarY);
+          }
         }
-
-        //Bar_ID_Y->Fill(barY);
-        PosY->Fill(posAlongY);
-        hTwMapPos->Fill(posAlongX, posAlongY);
       }
     }
 
@@ -296,6 +404,7 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
     {
       TATWhit *hitX = twNtuHit->GetHit(hitNumber_X, (Int_t)LayerX);
       Int_t barX = hitX->GetBar();
+      Double_t posAlongX = hitX->GetPosition();
       Double_t QAX = hitX->GetChargeChA();
       Double_t QBX = hitX->GetChargeChB();
       Double_t QBarX = sqrt(QAX * QBX);
@@ -303,10 +412,15 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
 
       TATWhit *hitY = twNtuHit->GetHit(hitNumber_Y, (Int_t)LayerY);
       Int_t barY = hitY->GetBar();
+      Double_t posAlongY = hitY->GetPosition();
       Double_t QAY = hitY->GetChargeChA();
       Double_t QBY = hitY->GetChargeChB();
       Double_t QBarY = sqrt(QAY * QBY);
       Double_t tofY = hitY->GetToF();
+
+      PosX->Fill(posAlongX);
+      PosY->Fill(posAlongY);
+      hTwMapPos->Fill(posAlongX, posAlongY);
 
       Bar_ID_X->Fill(barX);
       Bar_ID_Y->Fill(barY);
@@ -404,34 +518,6 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
         Charge_perBar_noCuts[layer][bar]->Fill(chargeBar);
         hToF_noCuts[layer][bar]->Fill(tof);
 
-        if (bar == 7 || bar == 9)
-        {
-          if (layer == (Int_t)LayerX)
-          {
-            if (bar == 7)
-            {
-              Ampl_PerBar_LayerX_Bar7->Fill(ampl);
-              scatterPlot_bar7->SetPoint(pointIndex_7++, ampl, chargeBar);
-            }
-            else
-            {
-              Ampl_PerBar_LayerX_Bar9->Fill(ampl);
-              scatterPlot_bar9->SetPoint(pointIndex_9++, ampl, chargeBar);
-            }
-          }
-          else if (layer == (Int_t)LayerY)
-          {
-            if (bar == 7)
-            {
-              Ampl_PerBar_LayerY_Bar7->Fill(ampl);
-            }
-            else
-            {
-              Ampl_PerBar_LayerY_Bar9->Fill(ampl);
-            }
-          }
-        }
-
         static Double_t posAlongX_Bar9 = -999; // Static variables to store X and Y positions for bar 9
         static Double_t posAlongY_Bar9 = -999;
 
@@ -474,22 +560,16 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
   }
 
   gTAGroot.EndEventLoop();
-  scatterPlot_bar9->SetLineStyle(0);
-  scatterPlot_bar9->SetLineWidth(0);
-  scatterPlot_bar7->SetLineStyle(0);
-  scatterPlot_bar7->SetLineWidth(0);
-  scatterPlot_bar9->SetMarkerStyle(20); // Set marker style
-  scatterPlot_bar9->SetMarkerSize(0.4);
-  scatterPlot_bar9->SetTitle("Scatter Plot Ampl vs Charge LayerX bar 9");
-  scatterPlot_bar9->GetXaxis()->SetTitle("Amplitude [a.u.]");
-  scatterPlot_bar9->GetYaxis()->SetTitle("Charge [a.u.]");
-  scatterPlot_bar9->Write("Scatter Plot Ampl vs Charge LayerX bar 9");
-  scatterPlot_bar7->SetMarkerStyle(20); // Set marker style
-  scatterPlot_bar7->SetMarkerSize(0.4);
-  scatterPlot_bar7->SetTitle("Scatter Plot Ampl vs Charge LayerX bar 7");
-  scatterPlot_bar7->GetXaxis()->SetTitle("Amplitude [a.u.]");
-  scatterPlot_bar7->GetYaxis()->SetTitle("Charge [a.u.]");
-  scatterPlot_bar7->Write("Scatter Plot Ampl vs Charge LayerX bar 7");
+
+  SetTitleAndLabels(scatterPlot_bar9_layerX, Form("Scatter plot charge vs signal ampl. layer X bar 9 @ %d MeV/u", energy), "Ampl [a.u.]", "Charge [a.u.]");
+  SetTitleAndLabels(scatterPlot_bar9_layerY, Form("Scatter plot charge vs signal ampl. layer Y bar 9 @ %d MeV/u", energy), "Ampl [a.u.]", "Charge [a.u.]");
+  SetTitleAndLabels(scatterPlot_bar9_layerX_filtered, Form("Filtered scatter plot charge vs signal ampl. layer X bar 9 @ %d MeV/u", energy), "Ampl [a.u.]", "Charge [a.u.]");
+  SetTitleAndLabels(scatterPlot_bar9_layerY_filtered, Form("Filtered scatter plot charge vs signal ampl. layer Y bar 9 @ %d MeV/u", energy), "Ampl [a.u.]", "Charge [a.u.]");
+
+  scatterPlot_bar9_layerX->Write("ScatterPlot_charge_vs_ampl_layerX_bar9");
+  scatterPlot_bar9_layerY->Write("ScatterPlot_charge_vs_ampl_layerY_bar9");
+  scatterPlot_bar9_layerX_filtered->Write("filtered_ScatterPlot_charge_vs_ampl_layerX_bar9");
+  scatterPlot_bar9_layerY_filtered->Write("filtered_ScatterPlot_charge_vs_ampl_layerY_bar9");
 
   cout << endl
        << "Job Done!" << endl;
@@ -511,6 +591,36 @@ void AdjustHistoRange(TH1D *Histo)
   Histo->GetXaxis()->SetRangeUser(Histo->GetBinLowEdge(Histo->FindFirstBinAbove()),
                                   Histo->GetBinLowEdge(Histo->FindLastBinAbove() + 1));
   return;
+}
+
+void SetTitleAndLabels(TObject* obj, const char* title, const char* xLabel, const char* yLabel) {
+    if (!obj) {
+        std::cerr << "Error: Null object passed to SetTitleAndLabels." << std::endl;
+        return;
+    }
+
+    if (TH1D* hist1D = dynamic_cast<TH1D*>(obj)) {
+        hist1D->SetTitle(title);
+        hist1D->GetXaxis()->SetTitle(xLabel);
+        hist1D->GetYaxis()->SetTitle(yLabel);
+    } 
+    else if (TH2D* hist2D = dynamic_cast<TH2D*>(obj)) {
+        hist2D->SetTitle(title);
+        hist2D->GetXaxis()->SetTitle(xLabel);
+        hist2D->GetYaxis()->SetTitle(yLabel);
+    } 
+    else if (TGraph* graph = dynamic_cast<TGraph*>(obj)) {
+        graph->SetTitle(title);
+        graph->GetXaxis()->SetTitle(xLabel);
+        graph->GetYaxis()->SetTitle(yLabel);
+        graph->SetLineStyle(0);
+        graph->SetLineWidth(0);
+        graph->SetMarkerStyle(20);
+        graph->SetMarkerSize(0.2);
+    } 
+    else {
+        std::cerr << "Error: Object type not supported." << std::endl;
+    }
 }
 
 void InitializeContainers()
@@ -546,11 +656,6 @@ void BookHistograms(TDirectory *DirChargeTimeLayerX, TDirectory *DirChargeTimeLa
   Bar_ID_X = new TH1D("BarID_LayerX", "BarID_LayerX", 200, 0, 19);
   Bar_ID_Y = new TH1D("BarID_LayerY", "BarID_LayerY", 200, 0, 19);
 
-  Ampl_PerBar_LayerX_Bar7 = new TH1D("Ampl_PerBar_LayerX_Bar7", "Ampl_PerBar_LayerX_Bar7", 200, -0.2, 1.2);
-  Ampl_PerBar_LayerX_Bar9 = new TH1D("Ampl_PerBar_LayerX_Bar9", "Ampl_PerBar_LayerX_Bar9", 200, -0.2, 1.2);
-  Ampl_PerBar_LayerY_Bar7 = new TH1D("Ampl_PerBar_LayerY_Bar7", "Ampl_PerBar_LayerY_Bar7", 200, -0.2, 1.2);
-  Ampl_PerBar_LayerY_Bar9 = new TH1D("Ampl_PerBar_LayerY_Bar9", "Ampl_PerBar_LayerY_Bar9", 200, -0.2, 1.2);
-
   hHits_X = new TH1D("Hits_LayerX", "Number of Hits LayerX", 100, 0, 10);
   hHits_Y = new TH1D("Hits_LayerY", "Number of Hits LayerY", 100, 0, 10);
   h_nValidHits_X = new TH1D("nValidHits_LayerX", "Number of Valid Hits LayerX", 100, 0, 10);
@@ -559,7 +664,7 @@ void BookHistograms(TDirectory *DirChargeTimeLayerX, TDirectory *DirChargeTimeLa
   for (int ilay = 0; ilay < kLayers; ilay++)
   {
 
-    dE_vs_tof[ilay] = new TH2D(Form("dE_vs_tof_%s", LayerName[(TLayer)ilay].data()), Form("dE_vs_tof_%s", LayerName[(TLayer)ilay].data()), 25000, 5., 30., 1200, 0., 120.); // 1~ps/bin - 0.1 MeV/bin
+    //dE_vs_tof[ilay] = new TH2D(Form("dE_vs_tof_%s", LayerName[(TLayer)ilay].data()), Form("dE_vs_tof_%s", LayerName[(TLayer)ilay].data()), 25000, 5., 30., 1200, 0., 120.); // 1~ps/bin - 0.1 MeV/bin
 
     for (int ibar = 0; ibar < (int)nBarsPerLayer; ibar++)
     {
@@ -595,7 +700,7 @@ void BookHistograms(TDirectory *DirChargeTimeLayerX, TDirectory *DirChargeTimeLa
   hTwMapPos_TWpntBin = new TH2D("hTwMapPos_TWpntBin", "hTwMapPos_TWpntBin", 22, -22., 22., 22, -22., 22.); // 2 cm/bin - 2 cm/bin
   hTwMapPos_TWpnt = new TH2D("hTwMapPos_TWpnt", "hTwMapPos_TWpnt", 220, -22., 22., 220, -22., 22.);        // 2 mm/bin - 2 mm/bin
 
-  Charge_vs_tof = new TH2D("Charge_vs_tof", "Charge_vs_tof", 220, 6., 20., 220, -2., 20.);
+  //Charge_vs_tof = new TH2D("Charge_vs_tof", "Charge_vs_tof", 220, 6., 20., 220, -2., 20.);
 
   hTwMapPos = new TH2D("hTwMapPos", "hTwMapPos", 220, -22., 22., 220, -22., 22.); // 2 mm/bin - 2 mm/bin
   hTwMapPos_Bar9 = new TH2D("hTwMapPos_Bar9", "hTwMapPos_Bar9", 220, -22., 22., 220, -22., 22.);

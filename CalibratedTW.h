@@ -23,6 +23,7 @@
 #include <TCanvas.h>
 #include <TLatex.h>
 #include <TDirectory.h>
+#include <TLinearFitter.h>
 
 #include "TAGcampaignManager.hxx"
 #include "TAGactTreeReader.hxx"
@@ -189,10 +190,13 @@ typedef std::vector<std::pair<Int_t,Int_t> > TVecPair;
 // TH1F*           fpHisSeedMap[MaxPlane];    ///< seed map
 // TH1F*           fpHisStripMap[MaxPlane];   ///< strip map
 
-TH2D *dE_vs_tof[kLayers];
-TH2D *dE_vs_tof_perBar[kLayers][nBarsPerLayer];
+TH2D *dE_vs_tof;
 TH2D *beta_vs_dE;
+TH1D *Eloss_perBar[kLayers][nBarsPerLayer];
 TH1D *Eloss_perBar_noCuts[kLayers][nBarsPerLayer];
+TH1D *My_eloss[kLayers][nBarsPerLayer];
+TH1D *My_eloss_noCuts[kLayers][nBarsPerLayer];
+TH1D *Charge_perBar[kLayers][nBarsPerLayer];
 TH1D *Charge_perBar_noCuts[kLayers][nBarsPerLayer];
 TH1D *hToF[kLayers][nBarsPerLayer];
 TH1D *hToF_noCuts[kLayers][nBarsPerLayer];
@@ -217,6 +221,7 @@ void  ProjectTracksOnTw(int Z, TVector3 init_pos, TVector3 init_p);
 void  LoopOverMCtracks(Int_t Emin, Int_t Emax, Bool_t isnotrig);
 void  AdjustHistoRange(TH1D *Histo);
 void SetTitleAndLabels(TObject* obj, const char* title, const char* xLabel, const char* yLabel);
+std::map<Int_t, std::map<Int_t, Double_t>> extractBarData();
 
 Bool_t IsVTregion(int reg);
 

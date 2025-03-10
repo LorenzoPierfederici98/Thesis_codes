@@ -169,23 +169,134 @@ void CalibratedTW(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t n
   materialObj.Write(Form("IonInfo run %d", runNumber));
   nentriesObj.Write(Form("nentries run %d", runNumber));
 
-  Int_t pointIndex = 0;
-  TCanvas *c = new TCanvas("c", "Scatter Plot", 800, 600);
+  // Int_t pointIndex = 0;
+  // TCanvas *c = new TCanvas("c", "Scatter Plot", 800, 600);
   // scatter plot of beta (x) vs dE/r*dx (y) [MeV * cm^2 / g]
-  TGraph *betaEloss = new TGraph();
+  // TGraph *betaEloss = new TGraph();
+
+  TCanvas *c = new TCanvas("c", "Scatter Plot", 800, 600);
+  TGraph *scatterPlot_bar9_layerX = new TGraph();
+  TGraph *scatterPlot_bar9_layerY = new TGraph();
+  TGraph *scatterPlot_bar9_layerX_filtered = new TGraph();
+  TGraph *scatterPlot_bar9_layerY_filtered = new TGraph();
+  Int_t pointIndex_bar9_layerX = 0;
+  Int_t pointIndex_bar9_layerY = 0;
+  Int_t pointIndex_bar9_layerX_filtered = 0;
+  Int_t pointIndex_bar9_layerY_filtered = 0;
 
   Double_t d_SC_TW = 1.;  // distance between SC and TW, in m
   Double_t bar_density = 1.023;  // density of the bars in g/cm^3
-  Double_t bar_thickness = 0.3;  // thickness of hte bars in cm 
-  // Loop over the TTree
-  gTAGroot.BeginEventLoop();
+  Double_t bar_thickness = 0.3;  // thickness of the bars in cm
+
   Int_t energy = std::stoi(beamEnergyStr);
   Int_t ev = -1;
+
+  // Extracting the calibration coefficients of every bar to build
+  // my calibrated eloss histograms
+  std::map<Int_t, std::map<Int_t, Double_t>> calibCoeff = extractBarData();
+
+  // Loop over the TTree to build the ampl-charge scatterplot
+  // to be fitted with a linear function, to discard the pileup hits
+  // which are far from the charge-ampl fit line
+  gTAGroot.BeginEventLoop();
+
+  while (gTAGroot.NextEvent() && ev != nentries)
+  {
+    ev++;
+    Int_t nHitsX = twNtuHit->GetHitN((Int_t)LayerX);
+    Int_t nHitsY = twNtuHit->GetHitN((Int_t)LayerY);
+
+    if (debug)
+      cout << " TWhits X::" << nHitsX << " Y::" << nHitsY << endl;
+
+    for (int ihitX = 0; ihitX < nHitsX; ihitX++)
+    {
+      TATWhit *hitX = twNtuHit->GetHit(ihitX, (Int_t)LayerX);
+      Double_t barX = hitX->GetBar();
+      Double_t QAX = hitX->GetChargeChA();
+      Double_t QBX = hitX->GetChargeChB();
+      Double_t QBarX = sqrt(QAX * QBX);
+      Double_t amplAX = hitX->GetAmplitudeChA();
+      Double_t amplBX = hitX->GetAmplitudeChB();
+      Double_t amplX = sqrt(amplAX * amplBX);
+      if (barX == 9)
+      {
+        scatterPlot_bar9_layerX->SetPoint(pointIndex_bar9_layerX++, amplX, QBarX);
+      }
+    }
+    for (int ihitY = 0; ihitY < nHitsY; ihitY++)
+    {
+      TATWhit *hitY = twNtuHit->GetHit(ihitY, (Int_t)LayerY);
+      Double_t barY = hitY->GetBar();
+      Double_t QAY = hitY->GetChargeChA();
+      Double_t QBY = hitY->GetChargeChB();
+      Double_t QBarY = sqrt(QAY * QBY);
+      Double_t amplAY = hitY->GetAmplitudeChA();
+      Double_t amplBY = hitY->GetAmplitudeChB();
+      Double_t amplY = sqrt(amplAY * amplBY);
+      if (barY == 9)
+      {
+        scatterPlot_bar9_layerY->SetPoint(pointIndex_bar9_layerY++, amplY, QBarY);
+      }
+    }
+  }
+
+  gTAGroot.EndEventLoop();
+
+  cout << "Ended first event loop" << endl;
+
+  int nPointsX = scatterPlot_bar9_layerX->GetN();
+  int nPointsY = scatterPlot_bar9_layerY->GetN();
+
+  if (nPointsX == 0 || nPointsY == 0) {
+      std::cerr << "Error: No points in scatter plots!" << std::endl;
+  }
+
+  TF1 *fitFunc_layerX = new TF1("fitFunc_layerX", "[0]*x", 0., 0.99);
+  TF1 *fitFunc_layerY = new TF1("fitFunc_layerY", "[0]*x", 0., 0.99);
+
+  fitFunc_layerX->SetParameter(0, 35.);
+  fitFunc_layerY->SetParameter(0, 35.);
+
+  TFitResultPtr fitX = scatterPlot_bar9_layerX->Fit(fitFunc_layerX, "SQROBR");
+  TFitResultPtr fitY = scatterPlot_bar9_layerY->Fit(fitFunc_layerY, "SQROBR");
+
+  Double_t slopeX = fitFunc_layerX->GetParameter(0);
+  Double_t slopeY = fitFunc_layerY->GetParameter(0);
+
+  cout << "slopeX: " << slopeX << " slopeY: " << slopeY << endl;
+
+  if (fitX->IsValid() && !fitY->IsValid())
+  {
+    cout << "fit layerY failed, setting slopeY = slopeX" << endl;
+    slopeY = slopeX;
+  }
+  else if (fitY->IsValid() && !fitX->IsValid())
+  {
+    cout << "fit layerX failed, setting slopeX = slopeY" << endl;
+    slopeX = slopeY;
+  }
+  else if (!fitX->IsValid() && !fitY->IsValid())
+  {
+    cout << "both fit failed, setting slopes to 33." << endl;
+    slopeX = 33.;
+    slopeY = 33.;
+  }
+
+  // needed for the second loop
+  ev = -1;
+  fActReader->Open(infile);
+  gTAGroot.AddRequiredItem(fActReader);
+
+  gTAGroot.BeginEventLoop();
+
+  // Second loop to build the charge-eloss histograms selecting events
+  // with 1 valid hit (defined with a threshold on charge values) on both
+  // layers and discarding pileup events (charge > charge_threshold from the fit line)
   while (gTAGroot.NextEvent() && ev != nentries)
   {
 
     ev++;
-
     if (debug)
       printf("\n Event: %d\n", ev);
     else if (ev % 10000 == 0)
@@ -227,40 +338,50 @@ void CalibratedTW(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t n
     Int_t hitNumber_X;
     Int_t hitNumber_Y;
 
+    Double_t charge_threshold = 0.7;
+
     for (int ihitX = 0; ihitX < nHitsX; ihitX++)
     {
 
       TATWhit *hitX = twNtuHit->GetHit(ihitX, (Int_t)LayerX);
-      Double_t posAlongX = hitX->GetPosition(); // it provides the X coordinate
       Double_t posBarY = twparGeo->GetBarPosition((Int_t)LayerX, hitX->GetBar())[1];
       Double_t barX = hitX->GetBar();
+      Double_t amplAX = hitX->GetAmplitudeChA();
+      Double_t amplBX = hitX->GetAmplitudeChB();
+      Double_t amplX = sqrt(amplAX * amplBX);
       Double_t QAX = hitX->GetChargeChA();
       Double_t QBX = hitX->GetChargeChB();
       Double_t QBarX = sqrt(QAX * QBX);
+      Double_t expected_chargeX = slopeX * amplX;
 
-      if (hitX->IsValid() && ((energy == 100 && QBarX > 1.) ||
+      if (hitX->IsValid() && (barX != 9 || (barX == 9 && (fabs(QBarX - expected_chargeX) < charge_threshold))) && ((energy == 100 && QBarX > 1.) ||
           (energy == 140 && QBarX > 0.95) ||
           (energy == 200 && QBarX > 0.8) ||
           (energy == 220 && QBarX > 0.7)))
       {
         nValidHitsX++;
         hitNumber_X = ihitX;
+        if (barX == 9)
+        {
+          scatterPlot_bar9_layerX_filtered->SetPoint(pointIndex_bar9_layerX_filtered++, amplX, QBarX);
+        }
       }
-
-      PosX->Fill(posAlongX);
 
       for (int ihitY = 0; ihitY < nHitsY; ihitY++)
       {
 
         TATWhit *hitY = twNtuHit->GetHit(ihitY, (Int_t)LayerY);
-        Double_t posAlongY = hitY->GetPosition(); // it provides the Y coordinate
         Double_t posBarX = twparGeo->GetBarPosition((Int_t)LayerY, hitY->GetBar())[0];
         Double_t barY = hitY->GetBar();
+        Double_t amplAY = hitY->GetAmplitudeChA();
+        Double_t amplBY = hitY->GetAmplitudeChB();
+        Double_t amplY = sqrt(amplAY * amplBY);
         Double_t QAY = hitY->GetChargeChA();
         Double_t QBY = hitY->GetChargeChB();
         Double_t QBarY = sqrt(QAY * QBY);
+        Double_t expected_chargeY = slopeY * amplY;
 
-        if (hitY->IsValid() && !countedY[ihitY] && ((energy == 100 && QBarY > 1.) ||
+        if (hitY->IsValid() && !countedY[ihitY] && (barY != 9 || (barY == 9 && (fabs(QBarY - expected_chargeY) < charge_threshold))) && ((energy == 100 && QBarY > 1.) ||
           (energy == 140 && QBarY > 0.95) ||
           (energy == 200 && QBarY > 0.8) ||
           (energy == 220 && QBarY > 0.7)))
@@ -268,10 +389,11 @@ void CalibratedTW(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t n
           nValidHitsY++;
           countedY[ihitY] = true; // Mark this hitY as counted
           hitNumber_Y = ihitY;
+          if (barY == 9)
+          {
+            scatterPlot_bar9_layerY_filtered->SetPoint(pointIndex_bar9_layerY_filtered++, amplY, QBarY);
+          }
         }
-
-        PosY->Fill(posAlongY);
-        hTwMapPos->Fill(posAlongX, posAlongY);
       }
     }
 
@@ -289,21 +411,47 @@ void CalibratedTW(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t n
     {
       TATWhit *hitX = twNtuHit->GetHit(hitNumber_X, (Int_t)LayerX);
       Int_t barX = hitX->GetBar();
+      Double_t posAlongX = hitX->GetPosition();
       Double_t QAX = hitX->GetChargeChA();
       Double_t QBX = hitX->GetChargeChB();
       Double_t QBarX = sqrt(QAX * QBX);
       Double_t tofX = hitX->GetToF();
+      Double_t elossX = hitX->GetEnergyLoss();
+      Double_t myelossX = QBarX * calibCoeff.at((Int_t)LayerX).at(barX);
+      Double_t betaX = d_SC_TW / ((3. / 10.) * tofX);  // 3/10 being c in m/ns, as tof is in ns
+      Double_t mass_stopping_powerX = myelossX / (bar_density * bar_thickness);
 
       TATWhit *hitY = twNtuHit->GetHit(hitNumber_Y, (Int_t)LayerY);
       Int_t barY = hitY->GetBar();
+      Double_t posAlongY = hitY->GetPosition();
       Double_t QAY = hitY->GetChargeChA();
       Double_t QBY = hitY->GetChargeChB();
       Double_t QBarY = sqrt(QAY * QBY);
       Double_t tofY = hitY->GetToF();
+      Double_t elossY = hitY->GetEnergyLoss();
+      Double_t myelossY = QBarY * calibCoeff.at((Int_t)LayerY).at(barY);
+      Double_t betaY = d_SC_TW / ((3. / 10.) * tofY);
+      Double_t mass_stopping_powerY = myelossY / (bar_density * bar_thickness);
 
       Bar_ID_X->Fill(barX);
       Bar_ID_Y->Fill(barY);
 
+      //beta_vs_dE->Fill(betaX, mass_stopping_powerX);
+      //beta_vs_dE->Fill(betaY, mass_stopping_powerY);
+
+      dE_vs_tof->Fill(tofX, elossX);
+      dE_vs_tof->Fill(tofY, elossY);
+
+      PosX->Fill(posAlongX);
+      PosY->Fill(posAlongY);
+      hTwMapPos->Fill(posAlongX, posAlongY);
+
+      Charge_perBar[(Int_t)LayerX][barX]->Fill(QBarX);
+      Charge_perBar[(Int_t)LayerY][barY]->Fill(QBarY);
+      Eloss_perBar[(Int_t)LayerX][barX]->Fill(elossX);
+      Eloss_perBar[(Int_t)LayerY][barY]->Fill(elossY);
+      My_eloss[(Int_t)LayerX][barX]->Fill(myelossX);
+      My_eloss[(Int_t)LayerY][barY]->Fill(myelossY);
       hToF[(Int_t)LayerX][barX]->Fill(tofX);
       hToF[(Int_t)LayerY][barY]->Fill(tofY);
     }
@@ -338,28 +486,46 @@ void CalibratedTW(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t n
       Double_t beta = d_SC_TW / ((3. / 10.) * tof);  // 3/10 being c in m/ns, as tof is in ns
 
       Double_t mass_stopping_power = eloss / (bar_density * bar_thickness);
+      Double_t myeloss = chargeBar * calibCoeff.at(layer).at(bar);
 
       // if (debug)
       //  printf("twhit::%d  %s  bar::%d  Z::%d  eloss::%f  NmcTrk::%d\n", ihit, LayerName[(TLayer)layer].data(), bar, Z, eloss, NmcTrk);
 
       if (!calibTw)
       {
-        dE_vs_tof[layer]->Fill(tof, eloss);
+        //dE_vs_tof[layer]->Fill(tof, eloss);
         Charge_perBar_noCuts[layer][bar]->Fill(chargeBar);
         Eloss_perBar_noCuts[layer][bar]->Fill(eloss);
         hToF_noCuts[layer][bar]->Fill(tof);
-        beta_vs_dE->Fill(beta, mass_stopping_power);
-        betaEloss->SetPoint(pointIndex++, beta, mass_stopping_power);
+        //beta_vs_dE->Fill(beta, mass_stopping_power);
+        My_eloss_noCuts[layer][bar]->Fill(myeloss);
+        //betaEloss->SetPoint(pointIndex++, beta, mass_stopping_power);
+
+        if (ev % 10000 == 0) {
+          cout << "Charge layer " << layer << " bar " << bar << " calib.coefficient (1/p0): " << calibCoeff.at(layer).at(bar) << endl;
+          cout << "charge: " << chargeBar << " eloss: " << eloss << " myeloss (q*1/p0): " << myeloss << endl; 
+        }
       }
+
+    
     }
   }
 
   gTAGroot.EndEventLoop();
 
-  SetTitleAndLabels(betaEloss, Form("#beta vs mass stopping power @ %d MeV/u beam energy", energy), "#beta", "#frac{dE}{#rho dx} [MeV cm^{2} g^{-1}]");
-  betaEloss->Write("ScatterPlot_beta_vs_dE");
-  SetTitleAndLabels(beta_vs_dE, Form("#beta vs mass stopping power @ %d MeV/u beam energy", energy), "#beta", "#frac{dE}{#rho dx} [MeV cm^{2} g^{-1}]");
+  //SetTitleAndLabels(betaEloss, Form("#beta vs mass stopping power @ %d MeV/u beam energy", energy), "#beta", "#frac{dE}{#rho dx} [MeV cm^{2} g^{-1}]");
+  //betaEloss->Write("ScatterPlot_beta_vs_dE");
+  //SetTitleAndLabels(beta_vs_dE, Form("#beta vs mass stopping power @ %d MeV/u beam energy", energy), "#beta", "#frac{dE}{#rho dx} [MeV cm^{2} g^{-1}]");
 
+  SetTitleAndLabels(scatterPlot_bar9_layerX, Form("Scatter plot charge vs signal ampl. layer X bar 9 @ %d MeV/u", energy), "Ampl [a.u.]", "Charge [a.u.]");
+  SetTitleAndLabels(scatterPlot_bar9_layerY, Form("Scatter plot charge vs signal ampl. layer Y bar 9 @ %d MeV/u", energy), "Ampl [a.u.]", "Charge [a.u.]");
+  SetTitleAndLabels(scatterPlot_bar9_layerX_filtered, Form("Filtered scatter plot charge vs signal ampl. layer X bar 9 @ %d MeV/u", energy), "Ampl [a.u.]", "Charge [a.u.]");
+  SetTitleAndLabels(scatterPlot_bar9_layerY_filtered, Form("Filtered scatter plot charge vs signal ampl. layer Y bar 9 @ %d MeV/u", energy), "Ampl [a.u.]", "Charge [a.u.]");
+
+  scatterPlot_bar9_layerX->Write("ScatterPlot_charge_vs_ampl_layerX_bar9");
+  scatterPlot_bar9_layerY->Write("ScatterPlot_charge_vs_ampl_layerY_bar9");
+  scatterPlot_bar9_layerX_filtered->Write("filtered_ScatterPlot_charge_vs_ampl_layerX_bar9");
+  scatterPlot_bar9_layerY_filtered->Write("filtered_ScatterPlot_charge_vs_ampl_layerY_bar9");
 
   cout << endl
        << "Job Done!" << endl;
@@ -372,6 +538,36 @@ void CalibratedTW(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t n
 }
 
 //-----------------------------------------------------------------------------
+std::map<Int_t, std::map<Int_t, Double_t>> extractBarData() {
+    std::map<Int_t, std::map<Int_t, Double_t>> barData;
+    std::string filename = "calib/HIT2022/TATW_Energy_Calibration_perBar_4742.cal"; // File is hardcoded
+    std::ifstream file(filename);
+
+    if (!file.is_open()) {
+        std::cerr << "Error opening file: " << filename << std::endl;
+        return barData;
+    }
+
+    std::string line;
+    while (std::getline(file, line)) {
+        if (line.empty() || line[0] == '#') continue; // Skip headers
+
+        std::istringstream iss(line);
+        Int_t barId, p1, shoeLayer;
+        Double_t p0;
+
+        if (!(iss >> barId >> p0 >> p1 >> shoeLayer)) continue; // Skip invalid lines
+
+        Int_t layer = shoeLayer;
+        Int_t correctedBar = (shoeLayer == 0) ? barId : barId - 20; // Adjust for X layer
+
+        barData[layer][correctedBar] = p0;
+    }
+
+    file.close();
+    return barData;
+}
+
 void AdjustHistoRange(TH1D *Histo)
 {
   Histo->GetXaxis()->SetRangeUser(Histo->GetBinLowEdge(Histo->FindFirstBinAbove()),
@@ -449,32 +645,46 @@ void BookHistograms(TDirectory *DirChargeElossLayerX, TDirectory *DirChargeEloss
   h_nValidHits_X = new TH1D("nValidHits_LayerX", "Number of Valid Hits LayerX", 100, 0, 10);
   h_nValidHits_Y = new TH1D("nValidHits_LayerY", "Number of Valid Hits LayerY", 100, 0, 10);
 
-  beta_vs_dE = new TH2D(Form("beta_vs_dE"), Form("#beta vs mass stopping power"), 600, 0., 0.6, 600, -10., 50.);
+  //beta_vs_dE = new TH2D(Form("beta_vs_dE"), Form("#beta vs mass stopping power"), 600, 0., 0.6, 600, -10., 50.);
+
+  dE_vs_tof = new TH2D("dE_vs_tof", "dE_vs_tof", 25000, 5., 30., 1300, -10., 120.); // 1~ps/bin - 0.1 MeV/bin
 
   for (int ilay = 0; ilay < kLayers; ilay++)
   {
 
-    dE_vs_tof[ilay] = new TH2D(Form("dE_vs_tof_%s", LayerName[(TLayer)ilay].data()), Form("dE_vs_tof_%s", LayerName[(TLayer)ilay].data()), 25000, 5., 30., 1300, -10., 120.); // 1~ps/bin - 0.1 MeV/bin
+    //dE_vs_tof[ilay] = new TH2D(Form("dE_vs_tof_%s", LayerName[(TLayer)ilay].data()), Form("dE_vs_tof_%s", LayerName[(TLayer)ilay].data()), 25000, 5., 30., 1300, -10., 120.); // 1~ps/bin - 0.1 MeV/bin
 
     for (int ibar = 0; ibar < (int)nBarsPerLayer; ibar++)
     {
+      Charge_perBar[ilay][ibar] = new TH1D(Form("Charge_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Charge %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 120, -2., 20.);
       Charge_perBar_noCuts[ilay][ibar] = new TH1D(Form("noCuts_Charge_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("No Cuts Charge %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 120, -2., 20.);
-      Eloss_perBar_noCuts[ilay][ibar] = new TH1D(Form("noCuts_Eloss_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("No Cuts Calibrated Energy Loss %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 300, -10., 20.);
+      Eloss_perBar_noCuts[ilay][ibar] = new TH1D(Form("noCuts_Eloss_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("No Cuts SHOE Calibrated Energy Loss %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 200, 0., 20.);
+      Eloss_perBar[ilay][ibar] = new TH1D(Form("Eloss_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("SHOE Calibrated Energy Loss %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 200, 0., 20.);
       hToF[ilay][ibar] = new TH1D(Form("ToF_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("ToF %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 220, 6., 20.);
-      hToF_noCuts[ilay][ibar] = new TH1D(Form("noCuts_ToF_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("No cuts ToF %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 220, 6., 20.);
+      hToF_noCuts[ilay][ibar] = new TH1D(Form("noCuts_ToF_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("No Cuts TOF %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 220, 6., 20.);
+      My_eloss_noCuts[ilay][ibar] = new TH1D(Form("noCuts_MyEloss_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("No Cuts Pisa Calibrated Energy Loss %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 200, 0., 20.);
+      My_eloss[ilay][ibar] = new TH1D(Form("MyEloss_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Pisa Calibrated Energy Loss %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 200, 0., 20.);
       if (ilay == (Int_t)LayerX)
       {
+        Charge_perBar[ilay][ibar]->SetDirectory(DirChargeElossLayerX);
         Charge_perBar_noCuts[ilay][ibar]->SetDirectory(DirChargeElossLayerX);
         Eloss_perBar_noCuts[ilay][ibar]->SetDirectory(DirChargeElossLayerX);
+        Eloss_perBar[ilay][ibar]->SetDirectory(DirChargeElossLayerX);
         hToF[ilay][ibar]->SetDirectory(DirToFLayerX);
         hToF_noCuts[ilay][ibar]->SetDirectory(DirToFLayerX);
+        My_eloss[ilay][ibar]->SetDirectory(DirChargeElossLayerX);
+        My_eloss_noCuts[ilay][ibar]->SetDirectory(DirChargeElossLayerX);
       }
       else
       {
+        Charge_perBar[ilay][ibar]->SetDirectory(DirChargeElossLayerY);
         Charge_perBar_noCuts[ilay][ibar]->SetDirectory(DirChargeElossLayerY);
         Eloss_perBar_noCuts[ilay][ibar]->SetDirectory(DirChargeElossLayerY);
+        Eloss_perBar[ilay][ibar]->SetDirectory(DirChargeElossLayerY);
         hToF[ilay][ibar]->SetDirectory(DirToFLayerY);
         hToF_noCuts[ilay][ibar]->SetDirectory(DirToFLayerY);
+        My_eloss[ilay][ibar]->SetDirectory(DirChargeElossLayerY);
+        My_eloss_noCuts[ilay][ibar]->SetDirectory(DirChargeElossLayerY);
       }
     }
   }
