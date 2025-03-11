@@ -219,8 +219,9 @@ void CalibratedTW(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t n
       Double_t amplAX = hitX->GetAmplitudeChA();
       Double_t amplBX = hitX->GetAmplitudeChB();
       Double_t amplX = sqrt(amplAX * amplBX);
-      if (barX == 9)
+      if (barX == 9 && hitX->IsValid())
       {
+        if (std::isnan(amplX) || std::isnan(QBarX) || std::isinf(amplX) || std::isinf(QBarX)) continue;
         scatterPlot_bar9_layerX->SetPoint(pointIndex_bar9_layerX++, amplX, QBarX);
       }
     }
@@ -234,8 +235,9 @@ void CalibratedTW(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t n
       Double_t amplAY = hitY->GetAmplitudeChA();
       Double_t amplBY = hitY->GetAmplitudeChB();
       Double_t amplY = sqrt(amplAY * amplBY);
-      if (barY == 9)
+      if (barY == 9 && hitY->IsValid())
       {
+        if (std::isnan(amplY) || std::isnan(QBarY) || std::isinf(amplY) || std::isinf(QBarY)) continue;
         scatterPlot_bar9_layerY->SetPoint(pointIndex_bar9_layerY++, amplY, QBarY);
       }
     }
