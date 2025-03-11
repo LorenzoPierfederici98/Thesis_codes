@@ -62,7 +62,7 @@ void ExtractMeanValues(const std::vector<std::pair<std::string, int>>& filesAndE
  * @param layer The layer identifier (e.g., "X" or "Y").
  * @param bar The bar number.
  */
-void WriteMeanDifferences(const std::vector<std::pair<std::string, int>>& filesAndEnergies, const std::vector<std::pair<std::string, int>>& filesAndEnergiesMC, const std::string& layer, int bar);
+void WriteMeanDifferences(const std::map<int, std::vector<std::string>> calibFiles, const std::vector<std::pair<std::string, int>>& filesAndEnergies, const std::vector<std::pair<std::string, int>>& filesAndEnergiesMC, const std::string& layer, int bar);
 
 
 

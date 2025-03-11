@@ -19,9 +19,15 @@ void CalibrateTof() {
         {"MC/TW/AnaFOOT_TW_DecodedMC_HIT2022_MC_200_Fit.root", 200},
         {"MC/TW/AnaFOOT_TW_DecodedMC_HIT2022_MC_220_Fit.root", 220}};
 
+    std::map<int, std::vector<std::string>> calibFiles;
+    calibFiles[100] = {"4766", "4884"};
+    calibFiles[140] = {"4801", "4877"};
+    calibFiles[200] = {"4742", "4868"};
+    calibFiles[220] = {"4828"};
+
     for (const std::string& layer : {"Y", "X"}) {
         for (int bar = 0; bar < 20; ++bar) {
-            WriteMeanDifferences(filesAndEnergies, filesAndEnergiesMC, layer, bar);
+            WriteMeanDifferences(calibFiles, filesAndEnergies, filesAndEnergiesMC, layer, bar);
         }
     }
 }
@@ -62,7 +68,8 @@ void ExtractMeanValues(const std::vector<std::pair<std::string, int>>& filesAndE
     }
 }
 
-void WriteMeanDifferences(const std::vector<std::pair<std::string, int>>& filesAndEnergies,
+void WriteMeanDifferences(const std::map<int, std::vector<std::string>> calibFiles,
+                          const std::vector<std::pair<std::string, int>>& filesAndEnergies,
                           const std::vector<std::pair<std::string, int>>& filesAndEnergiesMC,
                           const std::string& layer, int bar) {
     std::vector<double> meansData, meanErrorsData;
@@ -102,45 +109,48 @@ void WriteMeanDifferences(const std::vector<std::pair<std::string, int>>& filesA
         std::cout << "   Difference (Data - MC) [ns] = " << diff 
                   << " +- " << diffError << std::endl << std::endl;
         
-        // Build the output file name (one file per energy)
-        std::string outputFileName = "TATW_Tof_Calibration_perBar_HIT2022_" + std::to_string(energy) + "MeV_u.cal";
-        
-        // Determine whether to write the header.
-        // We do this by checking if the file already exists.
-        bool writeHeader = false;
+        for (size_t i = 0; i < calibFiles.at(energy).size(); i++)
         {
-            std::ifstream infile(outputFileName);
-            if (!infile.good()) {
-                writeHeader = true;
+            // Build the output file name (one file per energy)
+            std::string outputFileName = "TATW_Tof_Calibration_perBar_" + calibFiles.at(energy)[i] + ".cal";
+            
+            // Determine whether to write the header.
+            // We do this by checking if the file already exists.
+            bool writeHeader = false;
+            {
+                std::ifstream infile(outputFileName);
+                if (!infile.good()) {
+                    writeHeader = true;
+                }
+                infile.close();
             }
-            infile.close();
+            
+            // Open the file in append mode.
+            std::ofstream outFile;
+            outFile.open(outputFileName, std::ios::app);
+            if (!outFile.is_open()) {
+                std::cerr << "Error: Unable to open file " << outputFileName << std::endl;
+                continue;
+            }
+            
+            // Write header if needed.
+            if (writeHeader) {
+                outFile << "#BarId(Pisa)          DeltaT                σ(DeltaT)        layer(SHOE)" << std::endl;
+                outFile << "#-+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+-+-+-+-+-+-+-+-+-+-" << std::endl;
+            }
+            
+            // Write the data line
+            outFile << std::setw(10) << combinedBarID
+                    << std::setw(20) << diff
+                    << std::setw(19) << diffError
+                    << std::setw(10) << layerShoe
+                    << std::endl;
+            
+            // If this is the last combination (Layer X and bar 19), append the footer line once.
+            if ((layer == "X") && bar == 19) {
+                outFile << "#-+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+-+-+-+-+-+-+-+-+-+-" << std::endl;
+            }
+            outFile.close();
         }
-        
-        // Open the file in append mode.
-        std::ofstream outFile;
-        outFile.open(outputFileName, std::ios::app);
-        if (!outFile.is_open()) {
-            std::cerr << "Error: Unable to open file " << outputFileName << std::endl;
-            continue;
-        }
-        
-        // Write header if needed.
-        if (writeHeader) {
-            outFile << "#BarId(Pisa)          DeltaT                σ(DeltaT)        layer(SHOE)" << std::endl;
-            outFile << "#-+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+-+-+-+-+-+-+-+-+-+-" << std::endl;
-        }
-        
-        // Write the data line
-        outFile << std::setw(10) << combinedBarID
-                << std::setw(20) << diff
-                << std::setw(19) << diffError
-                << std::setw(10) << layerShoe
-                << std::endl;
-        
-         // If this is the last combination (Layer X and bar 19), append the footer line once.
-        if ((layer == "X") && bar == 19) {
-            outFile << "#-+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+--+-+-+-+-+-+-+-+-+-+-+-+-+-+-" << std::endl;
-        }
-        outFile.close();
     }
 }
