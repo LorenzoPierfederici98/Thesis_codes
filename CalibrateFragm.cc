@@ -296,7 +296,8 @@ void WriteFitValuesOrdered(const std::map<TString, double>& fitValues) {
         int combinedBarID = barID + (isLayerX ? 20 : 0);
 
         // Add to the sortedValues vector
-        sortedValues.emplace_back(combinedBarID, layerBarName, p0);
+        // Adding 1/p0 since E_loss = Q / p0
+        sortedValues.emplace_back(combinedBarID, layerBarName, 1./p0);
     }
 
     // Sort by the combined bar ID
@@ -305,10 +306,13 @@ void WriteFitValuesOrdered(const std::map<TString, double>& fitValues) {
 
     // Define the four output file names
     std::vector<std::string> outputFileNames = {
-        "TATW_Energy_calibration_perBar_HIT2022_100MeV_u.cal",
-        "TATW_Energy_calibration_perBar_HIT2022_140MeV_u.cal",
-        "TATW_Energy_calibration_perBar_HIT2022_200MeV_u.cal",
-        "TATW_Energy_calibration_perBar_HIT2022_220MeV_u.cal"
+        "TATW_Energy_Calibration_perBar_4742.cal",
+        "TATW_Energy_Calibration_perBar_4766.cal",
+        "TATW_Energy_Calibration_perBar_4801.cal",
+        "TATW_Energy_Calibration_perBar_4828.cal",
+        "TATW_Energy_Calibration_perBar_4868.cal",
+        "TATW_Energy_Calibration_perBar_4877.cal",
+        "TATW_Energy_Calibration_perBar_4884.cal"
     };
 
     // Write the content to each file
