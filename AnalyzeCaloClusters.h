@@ -190,15 +190,20 @@ typedef std::vector<std::pair<Int_t,Int_t> > TVecPair;
 // TH1F*           fpHisStripMap[MaxPlane];   ///< strip map
 
 TH1D *Charge_Calo_total;  //charge in all calo
+// Non calibrated and calibrated charge hist. form cluster size 2 and a single cluster
+TH1D *Charge_Calo_nonCalibrated; 
+TH1D *Charge_Calo_Calibrated;
 //TH1D *Charge_Calo_Module[kModules];  //charge per module in calo
 TH1D *Charge_Calo_crystal[kModules * kCrysPerModule];  //charge per crystal id in calo
 TH1D *ClusterCharge_Calo_crystal[kModules * kCrysPerModule];
+std::map<Int_t, TH1D*> minCharge;  // Min charge for every cluster size
 
 TH1D *Clusters_size;
 TH1D *Clusters_size_noCuts;
 TH1D *Clusters_number;
 TH2D *hClusterSize_Charge[kModules * kCrysPerModule];
 TH2D *Correlated_ClusterCharge[kCrysPerModule][kCrysPerModule];
+TH2D *MinCharge_ClusterSize;
 //TH2D *hCalClusterPos[max_cluster_number];
 
 TH2D *hCalMapPos[kModules];  //2D histogram of x, y positions in the calorimeter
@@ -210,6 +215,8 @@ void  GetFOOTgeo(TAGcampaignManager* camp_manager, Int_t run_number);
 void  GetRunAndGeoInfo( TAGcampaignManager* campManager, Int_t runNumber);
 void  SetTreeBranchAddress(TAGactTreeReader *treeReader);
 void  ProjectTracksOnTw(int Z, TVector3 init_pos, TVector3 init_p);
+void SetTitleAndLabels(TObject* obj, const char* title, const char* xLabel, const char* yLabel);
+std::map<Int_t, Double_t> extractCrystalData();
 
 Bool_t IsVTregion(int reg);
 

@@ -168,10 +168,14 @@ void AnalyzeCaloClusters(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
     materialObj.Write(Form("IonInfo run %d", runNumber));
     nentriesObj.Write(Form("nentries run %d", runNumber));
 
+    Int_t ev = -1;
+    Int_t energy = std::stoi(beamEnergyStr);
+    std::map<std::pair<int, int>, TGraph *> scatterPlots;
+
+    std::map<Int_t, Double_t> calibCoeff = extractCrystalData();
+
     // Loop over the TTree
     gTAGroot.BeginEventLoop();
-    Int_t ev = -1;
-    std::map<std::pair<int, int>, TGraph *> scatterPlots;
     while (gTAGroot.NextEvent() && ev != nentries)
     {
 
@@ -210,7 +214,7 @@ void AnalyzeCaloClusters(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
 
             if (charge_calo > 0.02)
             {
-                Charge_Calo_total->Fill(charge_calo);
+                //Charge_Calo_total->Fill(charge_calo);
                 Charge_Calo_crystal[crystal_id]->Fill(charge_calo);
                 // Charge_Calo_Module[ModuleID]->Fill(charge_calo);
                 hCalMapPos[ModuleID]->Fill(CaloPosition.X(), CaloPosition.Y());
@@ -232,28 +236,36 @@ void AnalyzeCaloClusters(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
                 continue;
 
             Int_t nClusterHits = cluster->GetHitsN(); // i.e. cluster size
-            Clusters_size->Fill(nClusterHits);
+            Clusters_size_noCuts->Fill(nClusterHits);
 
             // Double_t charge_cluster_total = 0;
             //  loop to find the total charge in the cluster
             Int_t valid_cluster_size = 0;
+            Double_t min_charge_cluster = std::numeric_limits<double>::max();
             for (int iclusterhit = 0; iclusterhit < nClusterHits; iclusterhit++)
             {
                 TACAhit *hit = cluster->GetHit(iclusterhit);
                 if (!hit || !hit->IsValid())
                     continue;
                 Double_t charge_cluster = hit->GetCharge();
-                if (charge_cluster > 0.02) {
+                if (charge_cluster < min_charge_cluster)
+                {
+                    min_charge_cluster = charge_cluster;
+                }
+                if (charge_cluster > 0.02)
+                {
                     valid_cluster_size++;
                 }
                 // charge_cluster_total += charge_cluster;
             }
-            Clusters_size_noCuts->Fill(valid_cluster_size);
+            if(nClusterHits < 7) minCharge[nClusterHits]->Fill(min_charge_cluster);
+            MinCharge_ClusterSize->Fill(nClusterHits, min_charge_cluster);
+            Clusters_size->Fill(valid_cluster_size);
 
             // cluster size 1
             if (nClusterHits == 1)
             {
-                cout << "event: " << ev << "cluster size = 1" << endl;
+                //cout << "event: " << ev << "cluster size = 1" << endl;
                 for (int iclusterhit = 0; iclusterhit < nClusterHits; iclusterhit++)
                 {
                     TACAhit *hit = cluster->GetHit(iclusterhit);
@@ -261,11 +273,10 @@ void AnalyzeCaloClusters(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
                         continue;
 
                     Int_t crystal_id = hit->GetCrystalId();
-                    cout << "crystal_id: " << crystal_id << endl;
+                    //cout << "crystal_id: " << crystal_id << endl;
                     Int_t ModuleID = crystal_id / kCrysPerModule;
                     TVector3 CaloPosition = hit->GetPosition();
                     Double_t charge_clusterHit = hit->GetCharge();
-
                     // if (crystal_id == 0) scatterPlot->SetPoint(pointIndex++, charge_cluster, nClusterHits);
                     if (charge_clusterHit > 0.02)
                     {
@@ -276,7 +287,7 @@ void AnalyzeCaloClusters(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
             }
             if (nClusterHits == 2 && nClusters == 1)
             {
-                cout << "event: " << ev << " cluster size = 2" << endl;
+                //cout << "event: " << ev << " cluster size = 2" << endl;
                 std::vector<int> crystal_ids;
                 std::vector<double> charge_values;
                 for (int iclusterhit = 0; iclusterhit < nClusterHits; iclusterhit++)
@@ -288,6 +299,23 @@ void AnalyzeCaloClusters(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
                     Int_t crystal_id = hit->GetCrystalId();
                     Int_t ModuleID = crystal_id / kCrysPerModule;
                     Double_t charge_clusterHit = hit->GetCharge();
+
+                    if (charge_clusterHit > 0.02) Charge_Calo_nonCalibrated->Fill(charge_clusterHit);
+
+                    // The find() method returns an iterator to the matching element if found, or end() if not found.
+                    if ((crystal_id == 0 || calibCoeff.find(crystal_id) != calibCoeff.end()) && charge_clusterHit > 0.02)
+                    {
+                        //cout << "crystal_id part of the calibration file" << endl;
+                        //cout << "normalizing its charge to crystal 0.." << endl;
+                    
+                        if (crystal_id != 0) charge_clusterHit = charge_clusterHit / calibCoeff.at(crystal_id);
+                        // prendere somma dei cristalli
+                        Charge_Calo_Calibrated->Fill(charge_clusterHit);
+                    }
+                    else if (crystal_id != 0 && calibCoeff.find(crystal_id) == calibCoeff.end())
+                    {
+                        if (crystal_id != 0) cout << "crystal_id " << crystal_id << " not part of calibration file" << endl;
+                    }
                     
                     if (charge_clusterHit > 0.02)
                     {
@@ -301,8 +329,8 @@ void AnalyzeCaloClusters(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
                     int id1 = crystal_ids[0], id2 = crystal_ids[1];
                     double charge1 = charge_values[0], charge2 = charge_values[1];
 
-                    cout << "crystal_id1: " << id1 << " charge1: " << charge1 << endl;
-                    cout << "crystal_id2: " << id2 << " charge2: " << charge2 << endl;
+                    //cout << "crystal_id1: " << id1 << " charge1: " << charge1 << endl;
+                    //cout << "crystal_id2: " << id2 << " charge2: " << charge2 << endl;
 
                     // Ensure the pair is always stored in a consistent order
                     std::pair<int, int> crystalPair;
@@ -335,8 +363,6 @@ void AnalyzeCaloClusters(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
                             scatterPlots[crystalPair]->SetMarkerStyle(20);
                             scatterPlots[crystalPair]->SetMarkerSize(0.35); // Default is 1
                             scatterPlots[crystalPair]->SetMarkerColor(kBlue);
-                            scatterPlots[crystalPair]->GetXaxis()->SetLimits(0., 0.55);
-                            scatterPlots[crystalPair]->GetXaxis()->SetRangeUser(0., 0.55);
                             scatterPlots[crystalPair]->SetMinimum(0.);
                             scatterPlots[crystalPair]->SetMaximum(0.55);
                             scatterPlots[crystalPair]->SetLineStyle(0);
@@ -352,6 +378,16 @@ void AnalyzeCaloClusters(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
     }
     // close for loop over events
     gTAGroot.EndEventLoop();
+
+    SetTitleAndLabels(MinCharge_ClusterSize, Form("Min. Charge vs Cluster Size @ %d MeV/u", energy), "Cluster Size", "Min.Charge [a.u.]");
+
+    for (int iclusterHit = 1; iclusterHit < 7; iclusterHit++)
+    {
+        SetTitleAndLabels(minCharge[iclusterHit], Form("Min. Charge Cluster Size %d @ %d MeV/u", iclusterHit, energy), "Min.Charge", "");
+    }
+
+    SetTitleAndLabels(Charge_Calo_Calibrated, Form("Charge Calo Calibrated (single cluster of size 2) @ %d MeV/u", energy), "Charge [a.u.]", "");
+    SetTitleAndLabels(Charge_Calo_nonCalibrated, Form("Non Calibrated Charge Calo (single cluster of size 2) @ %d MeV/u", energy), "Charge [a.u.]", "");
 
     cout << endl
          << "Job Done!" << endl;
@@ -384,6 +420,63 @@ void InitializeContainers()
     return;
 }
 
+std::map<Int_t, Double_t> extractCrystalData() {
+    std::map<Int_t, Double_t> crystalData;
+    std::string filename = "calib/HIT2022/SlopeRatios.cal"; // File is hardcoded
+    std::ifstream file(filename);
+
+    if (!file.is_open()) {
+        std::cerr << "Error opening file: " << filename << std::endl;
+        return crystalData;
+    }
+
+    std::string line;
+    while (std::getline(file, line)) {
+        if (line.empty() || line[0] == '#') continue; // Skip headers
+
+        std::istringstream iss(line);
+        Int_t crystalId;
+        Double_t p0, p0_err;
+
+        if (!(iss >> crystalId >> p0 >> p0_err)) continue; // Skip invalid lines
+
+        crystalData[crystalId]= p0;
+    }
+
+    file.close();
+    return crystalData;
+}
+
+void SetTitleAndLabels(TObject* obj, const char* title, const char* xLabel, const char* yLabel) {
+    if (!obj) {
+        std::cerr << "Error: Null object passed to SetTitleAndLabels." << std::endl;
+        return;
+    }
+
+    if (TH1D* hist1D = dynamic_cast<TH1D*>(obj)) {
+        hist1D->SetTitle(title);
+        hist1D->GetXaxis()->SetTitle(xLabel);
+        hist1D->GetYaxis()->SetTitle(yLabel);
+    } 
+    else if (TH2D* hist2D = dynamic_cast<TH2D*>(obj)) {
+        hist2D->SetTitle(title);
+        hist2D->GetXaxis()->SetTitle(xLabel);
+        hist2D->GetYaxis()->SetTitle(yLabel);
+    } 
+    else if (TGraph* graph = dynamic_cast<TGraph*>(obj)) {
+        graph->SetTitle(title);
+        graph->GetXaxis()->SetTitle(xLabel);
+        graph->GetYaxis()->SetTitle(yLabel);
+        graph->SetLineStyle(0);
+        graph->SetLineWidth(0);
+        graph->SetMarkerStyle(20);
+        graph->SetMarkerSize(0.2);
+    } 
+    else {
+        std::cerr << "Error: Object type not supported." << std::endl;
+    }
+}
+
 //-----------------------------------------------------------------------------
 
 void BookHistograms()
@@ -396,12 +489,20 @@ void BookHistograms()
     // AddHistogram(fpHisStripMap);
     int modules[7] = {4, 5, 3, 6, 2, 7, 1}; // module enumeration following the excel file
 
-    Charge_Calo_total = new TH1D(Form("Charge_Calo"), Form("Charge_Calo"), 500, -0.2, 1.5);
+    //Charge_Calo_total = new TH1D(Form("Charge_Calo"), Form("Charge_Calo"), 500, -0.2, 1.5);
+    Charge_Calo_Calibrated = new TH1D(Form("Charge_Calo_Calibrated"), Form("Charge Calo Calibrated (single cluster of size 2)"), 500, -0.2, 1.5);
+    Charge_Calo_nonCalibrated = new TH1D(Form("Charge_Calo_nonCalibrated"), Form("Non-Calibrated Charge Calo (single cluster of size 2)"), 500, -0.2, 1.5);
+
 
     Clusters_number = new TH1D(Form("Clusters_number"), Form("Clusters_number"), 100, -1., 5.);
-    Clusters_size = new TH1D(Form("Clusters_size"), Form("Clusters_size"), 100, -1., 20.);
-    Clusters_size_noCuts = new TH1D(Form("Clusters_size_noCuts"), Form("Clusters size no Cuts"), 100, -1., 20.);
+    Clusters_size_noCuts = new TH1D(Form("noCuts_Clusters_size"), Form("No Cuts Clusters_size"), 100, -1., 20.);
+    Clusters_size = new TH1D(Form("Clusters_size"), Form("Clusters size"), 100, -1., 20.);
 
+    for (int iclusterHit = 1; iclusterHit < 7; iclusterHit++)
+    {
+        minCharge[iclusterHit] = new TH1D(Form("MinCharge_ClusterSize_%d", iclusterHit), Form("Min. Charge Cluster Size %d", iclusterHit), 220, -0.5, 1.5);
+    }
+    MinCharge_ClusterSize = new TH2D(Form("h2D_MinCharge_ClusterSize"), Form("Min.Charge vs Cluster Size"), 100, 0, 6, 220, -0.5, 1.5);
     // Correlated charge for cluster-size = 2, for the central module (ids from 0 to 8)
     for (int icrystal_x = 0; icrystal_x < kCrysPerModule; icrystal_x++)
     {
