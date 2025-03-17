@@ -1,3 +1,12 @@
+// Macro that collects the charge fit results of AnalyzePeakCrystal.cc for every calorimeter crystal
+// from files named like AnaFOOT_Calo_Decoded_HIT2022_100MeV_Fit.root. A charge-beam energy plot is
+// built for every crystal and fitted with a 1 parameter (slope) linear function. An intercalibration
+// is then performed for those crystals with at least 2 fitted charge peaks out of 5 energy values, by
+// computing the ratio of the slopes of a certain crystal with respect to crystal ID 0 (the central crystal).
+// Those ratios are used as scaling factors to sum the charge for events with a single cluster of size 2,
+// that is with 2 crystals involved. The calibration coefficients for every available crystal are stored
+// in a file named SlopeRatios.cal, stored in calib/HIT2022/.
+
 #include "CaloPeakEnergyDisplay.h"
 
 void CaloPeakEnergyDisplay() {
