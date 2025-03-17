@@ -195,6 +195,8 @@ void CalibratedTW(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t n
   // my calibrated eloss histograms
   std::map<Int_t, std::map<Int_t, Double_t>> calibCoeff = extractBarData();
 
+  std::map<Int_t, std::map<Int_t, Double_t>> tofCoeff = extractTofData(energy);
+
   // Loop over the TTree to build the ampl-charge scatterplot
   // to be fitted with a linear function, to discard the pileup hits
   // which are far from the charge-ampl fit line
@@ -340,7 +342,7 @@ void CalibratedTW(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t n
     Int_t hitNumber_X;
     Int_t hitNumber_Y;
 
-    Double_t charge_threshold = 0.7;
+    Double_t charge_threshold = (energy == 220) ? 0.5 : 0.7;
 
     for (int ihitX = 0; ihitX < nHitsX; ihitX++)
     {
@@ -419,7 +421,9 @@ void CalibratedTW(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t n
       Double_t QBarX = sqrt(QAX * QBX);
       Double_t tofX = hitX->GetToF();
       Double_t elossX = hitX->GetEnergyLoss();
+      Double_t nonCalib_tofX = hitX->GetTime();
       Double_t myelossX = QBarX * calibCoeff.at((Int_t)LayerX).at(barX);
+      Double_t mytofX = nonCalib_tofX - tofCoeff.at((Int_t)LayerX).at(barX);
       Double_t betaX = d_SC_TW / ((3. / 10.) * tofX);  // 3/10 being c in m/ns, as tof is in ns
       Double_t mass_stopping_powerX = myelossX / (bar_density * bar_thickness);
 
@@ -431,7 +435,9 @@ void CalibratedTW(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t n
       Double_t QBarY = sqrt(QAY * QBY);
       Double_t tofY = hitY->GetToF();
       Double_t elossY = hitY->GetEnergyLoss();
+      Double_t nonCalib_tofY = hitY->GetTime();
       Double_t myelossY = QBarY * calibCoeff.at((Int_t)LayerY).at(barY);
+      Double_t mytofY = nonCalib_tofY - tofCoeff.at((Int_t)LayerY).at(barY);
       Double_t betaY = d_SC_TW / ((3. / 10.) * tofY);
       Double_t mass_stopping_powerY = myelossY / (bar_density * bar_thickness);
 
@@ -456,6 +462,8 @@ void CalibratedTW(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t n
       My_eloss[(Int_t)LayerY][barY]->Fill(myelossY);
       hToF[(Int_t)LayerX][barX]->Fill(tofX);
       hToF[(Int_t)LayerY][barY]->Fill(tofY);
+      MyhToF[(Int_t)LayerX][barX]->Fill(mytofX);
+      MyhToF[(Int_t)LayerY][barY]->Fill(mytofY);
     }
 
     Int_t nHits = twNtuHit->GetHitN();
@@ -570,6 +578,40 @@ std::map<Int_t, std::map<Int_t, Double_t>> extractBarData() {
     return barData;
 }
 
+std::map<Int_t, std::map<Int_t, Double_t>> extractTofData(Int_t energy) {
+  std::map<Int_t, std::map<Int_t, Double_t>> tofData;
+  std::string filename;
+  if (energy == 100) filename = "calib/HIT2022/TATW_Tof_Calibration_perBar_4766.cal";
+  else if (energy == 140) filename = "calib/HIT2022/TATW_Tof_Calibration_perBar_4801.cal";
+  else if (energy == 200) filename = "calib/HIT2022/TATW_Tof_Calibration_perBar_4742.cal";
+  else if (energy == 220) filename = "calib/HIT2022/TATW_Tof_Calibration_perBar_4828.cal";
+  std::ifstream file(filename);
+
+  if (!file.is_open()) {
+      std::cerr << "Error opening file: " << filename << std::endl;
+      return tofData;
+  }
+
+  std::string line;
+  while (std::getline(file, line)) {
+      if (line.empty() || line[0] == '#') continue; // Skip headers
+
+      std::istringstream iss(line);
+      Int_t barId, shoeLayer;
+      Double_t Delta_t, sigma_t;
+
+      if (!(iss >> barId >> Delta_t >> sigma_t >> shoeLayer)) continue; // Skip invalid lines
+
+      Int_t layer = shoeLayer;
+      Int_t correctedBar = (shoeLayer == 0) ? barId : barId - 20; // Adjust for X layer
+
+      tofData[layer][correctedBar] = Delta_t;
+  }
+
+  file.close();
+  return tofData;
+}
+
 void AdjustHistoRange(TH1D *Histo)
 {
   Histo->GetXaxis()->SetRangeUser(Histo->GetBinLowEdge(Histo->FindFirstBinAbove()),
@@ -663,6 +705,7 @@ void BookHistograms(TDirectory *DirChargeElossLayerX, TDirectory *DirChargeEloss
       Eloss_perBar_noCuts[ilay][ibar] = new TH1D(Form("noCuts_Eloss_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("No Cuts SHOE Calibrated Energy Loss %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 200, 0., 20.);
       Eloss_perBar[ilay][ibar] = new TH1D(Form("Eloss_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("SHOE Calibrated Energy Loss %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 200, 0., 20.);
       hToF[ilay][ibar] = new TH1D(Form("ToF_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("ToF %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 220, 6., 20.);
+      MyhToF[ilay][ibar] = new TH1D(Form("MyToF_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Pisa Calibrated ToF %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 220, 6., 20.);
       hToF_noCuts[ilay][ibar] = new TH1D(Form("noCuts_ToF_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("No Cuts TOF %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 220, 6., 20.);
       My_eloss_noCuts[ilay][ibar] = new TH1D(Form("noCuts_MyEloss_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("No Cuts Pisa Calibrated Energy Loss %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 200, 0., 20.);
       My_eloss[ilay][ibar] = new TH1D(Form("MyEloss_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Pisa Calibrated Energy Loss %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 200, 0., 20.);
@@ -673,6 +716,7 @@ void BookHistograms(TDirectory *DirChargeElossLayerX, TDirectory *DirChargeEloss
         Eloss_perBar_noCuts[ilay][ibar]->SetDirectory(DirChargeElossLayerX);
         Eloss_perBar[ilay][ibar]->SetDirectory(DirChargeElossLayerX);
         hToF[ilay][ibar]->SetDirectory(DirToFLayerX);
+        MyhToF[ilay][ibar]->SetDirectory(DirToFLayerX);
         hToF_noCuts[ilay][ibar]->SetDirectory(DirToFLayerX);
         My_eloss[ilay][ibar]->SetDirectory(DirChargeElossLayerX);
         My_eloss_noCuts[ilay][ibar]->SetDirectory(DirChargeElossLayerX);
@@ -684,6 +728,7 @@ void BookHistograms(TDirectory *DirChargeElossLayerX, TDirectory *DirChargeEloss
         Eloss_perBar_noCuts[ilay][ibar]->SetDirectory(DirChargeElossLayerY);
         Eloss_perBar[ilay][ibar]->SetDirectory(DirChargeElossLayerY);
         hToF[ilay][ibar]->SetDirectory(DirToFLayerY);
+        MyhToF[ilay][ibar]->SetDirectory(DirToFLayerY);
         hToF_noCuts[ilay][ibar]->SetDirectory(DirToFLayerY);
         My_eloss[ilay][ibar]->SetDirectory(DirChargeElossLayerY);
         My_eloss_noCuts[ilay][ibar]->SetDirectory(DirChargeElossLayerY);

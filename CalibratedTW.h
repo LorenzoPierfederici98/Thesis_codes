@@ -199,6 +199,7 @@ TH1D *My_eloss_noCuts[kLayers][nBarsPerLayer];
 TH1D *Charge_perBar[kLayers][nBarsPerLayer];
 TH1D *Charge_perBar_noCuts[kLayers][nBarsPerLayer];
 TH1D *hToF[kLayers][nBarsPerLayer];
+TH1D *MyhToF[kLayers][nBarsPerLayer];
 TH1D *hToF_noCuts[kLayers][nBarsPerLayer];
 TH1D *PosX;  //bar hit position in layerX
 TH1D *PosY;  //bar hit position in layerY
@@ -222,6 +223,7 @@ void  LoopOverMCtracks(Int_t Emin, Int_t Emax, Bool_t isnotrig);
 void  AdjustHistoRange(TH1D *Histo);
 void SetTitleAndLabels(TObject* obj, const char* title, const char* xLabel, const char* yLabel);
 std::map<Int_t, std::map<Int_t, Double_t>> extractBarData();
+std::map<Int_t, std::map<Int_t, Double_t>> extractTofData(Int_t energy);
 
 Bool_t IsVTregion(int reg);
 

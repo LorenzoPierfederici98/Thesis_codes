@@ -331,7 +331,7 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
     Int_t hitNumber_X;
     Int_t hitNumber_Y;
 
-    Double_t charge_threshold = 0.7;
+    Double_t charge_threshold = (energy == 220) ? 0.5 : 0.7;
 
     for (int ihitX = 0; ihitX < nHitsX; ihitX++)
     {
@@ -410,7 +410,8 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
       Double_t QAX = hitX->GetChargeChA();
       Double_t QBX = hitX->GetChargeChB();
       Double_t QBarX = sqrt(QAX * QBX);
-      Double_t tofX = hitX->GetToF();
+      // GetTime() gives TA + TB / 2 - T_SC-> raw TOF (GetTof is not calibrated)
+      Double_t tofX = hitX->GetTime();
 
       TATWhit *hitY = twNtuHit->GetHit(hitNumber_Y, (Int_t)LayerY);
       Int_t barY = hitY->GetBar();
@@ -418,7 +419,7 @@ void AnalyzeTWChargeTime(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
       Double_t QAY = hitY->GetChargeChA();
       Double_t QBY = hitY->GetChargeChB();
       Double_t QBarY = sqrt(QAY * QBY);
-      Double_t tofY = hitY->GetToF();
+      Double_t tofY = hitY->GetTime();
 
       PosX->Fill(posAlongX);
       PosY->Fill(posAlongY);
