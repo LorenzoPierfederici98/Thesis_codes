@@ -14,7 +14,7 @@
 
 void PrintMeasurement(double value, double uncertainty);
 
-TFitResultPtr FitPeakWithTSpectrum(TH1D *hist, double threshold);
+TFitResultPtr FitPeakWithTSpectrum(TH1D *hist, int energy, int crystal_ID);
 
 std::tuple<TH1D*, TH1D*> FindHistograms(TFile *inFile, const TString &histName_total, const TString &histName);
 

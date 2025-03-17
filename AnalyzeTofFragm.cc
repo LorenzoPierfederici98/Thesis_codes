@@ -32,8 +32,8 @@ void FitHistogramsInDirectory(
     std::map<TString, std::map<int, double>> &TofErrors,
     TFile *outputFile)
 {
-    if (!dir)
-        return;
+    if (!dir) return;
+    cout << "here" << endl;
 
     TIter next(dir->GetListOfKeys());
     TKey *key;
@@ -151,22 +151,24 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
             {
                 if (barNumber == 0)
                 {
-                    peakPosition = 11.8;
-                    binFit = 5;
+                    binFit = 7;
+                }
+                else if (barNumber == 1 || barNumber == 4 || barNumber == 5 || barNumber == 14)
+                {
+                    binFit = 3;
                 }
                 else if (barNumber == 17)
                 {
-                    peakPosition = 11.48;
+                    peakPosition = 13.8;
                     binFit = 10;
                 }
                 else if (barNumber == 18)
                 {
-                    peakPosition = 12.34;
                     binFit = 10;
                 }
                 else if (barNumber == 19)
                 {
-                    peakPosition = 11.9;
+                    peakPosition = 14.35;
                     binFit = 15;
                 }
             }
@@ -174,22 +176,25 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
             {
                 if (barNumber == 0)
                 {
-                    peakPosition = 11.7;
+                    peakPosition = 14.25;
                     binFit = 8;
                 }
                 else if (barNumber == 1)
                 {
-                    binFit = 8;
+                    binFit = 7;
                 }
                 else if (barNumber == 3) {
                     binFit = 5;
                 }
-                else if (barNumber == 12 || barNumber == 13) {
+                else if (barNumber == 4 || barNumber == 11 || barNumber == 12 || barNumber == 13) {
                     binFit = 3;
+                }
+                else if (barNumber == 18)
+                {
+                    peakPosition = 13.75;
                 }
                 else if (barNumber == 19)
                 {
-                    peakPosition = 12.2;
                     binFit = 20;
                 }
             }
@@ -200,26 +205,25 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
             {
                 if (barNumber == 0)
                 {
-                    peakPosition = 10.1;
-                    binFit = 10;
+                    peakPosition = 12.9;
+                    binFit = 9;
                 }
-                else if (barNumber == 1) {
-                    peakPosition = 10.;
-                    binFit = 10;
-                }
-                else if (barNumber == 2)
+                else if (barNumber == 1)
                 {
-                    peakPosition = 9.98;
+                    peakPosition = 12.6;
+                    binFit = 9;
+                }           
+                else if(barNumber == 2)
+                {
                     binFit = 10;
                 }
                 else if (barNumber == 3)
                 {
-                    peakPosition = 10.3;
-                    binFit = 13;
+                    binFit = 6;
                 }
                 else if (barNumber == 4)
                 {
-                    binFit = 6;
+                    binFit = 7;
                 }
                 else if (barNumber == 14)
                 {
@@ -227,22 +231,24 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
                 }
                 else if (barNumber == 15)
                 {
-                    peakPosition = 9.9;
                     binFit = 12;
+                }
+                else if (barNumber == 16)
+                {
+                    binFit = 7;
                 }
                 else if (barNumber == 17)
                 {
-                    peakPosition = 9.6;
-                    binFit = 11;
+                    peakPosition = 12.1;
+                    binFit = 9;
                 }
                 else if (barNumber == 18)
                 {
-                    peakPosition = 10.5;
-                    binFit = 16;
+                    peakPosition = 12.8;
+                    binFit = 12;
                 }
                 else if (barNumber == 19)
                 {
-                    peakPosition = 10.3;
                     binFit = 14;
                 }
             }
@@ -250,28 +256,35 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
             {
                 if (barNumber == 0)
                 {
-                    peakPosition = 9.8;
-                    binFit = 15;
+                    peakPosition = 12.75;
+                    binFit = 10;
                 }
                 else if (barNumber == 1)
                 {
-                    peakPosition = 10.1;
                     binFit = 8;
+                }
+                else if (barNumber == 2)
+                {
+                    binFit = 7;
                 }
                 else if (barNumber == 3)
                 {
+                    peakPosition = 12.3;
                     binFit = 7;
                 }
                 else if (barNumber == 4)
                 {
+                    peakPosition = 12.54;
                     binFit = 6;
                 }
                 else if (barNumber == 13 || barNumber == 14)
                 {
+                    if (barNumber == 14) peakPosition = 12.37;
                     binFit = 6;
                 }
                 else if (barNumber == 15)
                 {
+                    peakPosition = 12.65;
                     binFit = 7;
                 }
                 else if (barNumber == 16 || barNumber == 17 || barNumber == 19)
@@ -283,7 +296,6 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
                 }
                 else if (barNumber == 18)
                 {
-                    peakPosition = 9.5;
                     binFit = 12;
                 }
             }
@@ -297,18 +309,17 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
                 if (barNumber < 3)
                 {
                     binFit = 10;
-                    if (barNumber == 1) {
-                        peakPosition = 8.5;
-                    }
                 }
                 if (barNumber == 3)
                 {
-                    peakPosition = 8.85;
                     binFit = 7;
+                }
+                if (barNumber == 6 || barNumber == 7)
+                {
+                    binFit = 4;
                 }
                 else if (barNumber == 15)
                 {
-                    peakPosition = 8.19;
                     binFit = 7;
                 }
                 else if (barNumber == 16)
@@ -317,16 +328,17 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
                 }
                 else if (barNumber == 17)
                 {
-                    binFit = 10;
+                    peakPosition = 10.9;
+                    binFit = 8;
                 }
                 else if (barNumber == 18)
                 {
-                    peakPosition = 9.45;
+                    peakPosition = 11.44;
                     binFit = 10;
                 }
                 else if (barNumber == 19)
                 {
-                    peakPosition = 9.2;
+                    peakPosition = 11.6;
                     binFit = 13;
                 }
             }
@@ -334,34 +346,36 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
             {
                 if (barNumber == 0)
                 {
-                    peakPosition = 8.81;
+                    peakPosition = 11.3;
                     binFit = 10;
                 }
                 else if (barNumber == 1)
                 {
-                    peakPosition = 8.7;
                     binFit = 8;
                 }
                 else if (barNumber == 2)
                 {
-                    peakPosition = 8.6;
                     binFit = 7;
                 }
                 else if (barNumber == 3 || barNumber == 4)
                 {
                     binFit = 7;
                 }
+                else if (barNumber == 15)
+                {
+                    binFit = 6;
+                }
                 else if (barNumber == 17) {
-                    peakPosition = 8.8;
-                    binFit = 9;
+                    peakPosition = 11.36;
+                    binFit = 15;
                 }
                 else if (barNumber == 18)
                 {
+                    peakPosition = 11.0;
                     binFit = 10;
                 }
                 else if (barNumber == 19)
                 {
-                    // peakPosition = 9.1;
                     binFit = 10;
                 }
             }
@@ -373,11 +387,12 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
             {
                 if (barNumber == 0)
                 {
+                    peakPosition = 11.15;
                     binFit = 10;
                 }
-                else if (barNumber == 2)
+                else if (barNumber == 1 || barNumber == 2)
                 {
-                    peakPosition = 8.5;
+                    if (barNumber == 2) peakPosition = 10.9;
                     binFit = 10;
                 }
                 else if (barNumber == 3 || barNumber == 4)
@@ -386,32 +401,24 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
                 }
                 else if (barNumber == 14)
                 {
-                    peakPosition = 8.4;
                     binFit = 7;
                 }
                 else if (barNumber == 13 || barNumber == 15)
                 {
+                    if (barNumber == 15) peakPosition = 10.84;
                     binFit = 7;
-                    if (barNumber == 15) {
-                        peakPosition = 7.9;
-                    }
                 }
-                else if (barNumber == 16)
+                else if (barNumber == 16 || barNumber == 17)
                 {
-                    peakPosition = 8.3;
                     binFit = 10;
-                }
-                else if (barNumber == 17) {
-                    peakPosition = 7.87;
                 }
                 else if (barNumber == 18)
                 {
-                    peakPosition = 9.2;
+                    peakPosition = 11.16;
                     binFit = 10;
                 }
                 else if (barNumber == 19)
                 {
-                    peakPosition = 8.7;
                     binFit = 10;
                 }
             }
@@ -419,16 +426,19 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
             {
                 if (barNumber == 0)
                 {
-                    peakPosition = 8.6;
-                    binFit = 8;
+                    peakPosition = 11.1;
+                    binFit = 9;
                 }
                 else if (barNumber == 1)
                 {
-                    peakPosition = 8.5;
                     binFit = 7;
                 }
                 else if (barNumber == 2) {
-                    peakPosition = 8.56;
+                    peakPosition = 11.0;
+                    binFit = 7;
+                }
+                else if (barNumber == 3)
+                {
                     binFit = 7;
                 }
                 else if (barNumber == 4) {
@@ -436,7 +446,6 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
                 }
                 else if (barNumber == 14)
                 {
-                    peakPosition = 8.3;
                     binFit = 8;
                 }
                 else if (barNumber == 15) {
@@ -444,8 +453,8 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
                 }
                 else if (barNumber == 16)
                 {
-                    peakPosition = 8.6;
-                    binFit = 10;
+                    peakPosition = 11.0;
+                    binFit = 9;
                 }
                 else if (barNumber == 17 || barNumber == 19)
                 {
@@ -453,7 +462,6 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
                 }
                 else if (barNumber == 18)
                 {
-                    peakPosition = 7.7;
                     binFit = 10;
                 }
             }
@@ -469,7 +477,6 @@ TFitResultPtr FitPeaksWithTSpectrum(TH1D *hist, int energy, const TString &layer
         if (fitResult->Status() != 0)
         {
             cout << "fit failed" << endl;
-            delete hist;
             return nullptr;
         }
         else

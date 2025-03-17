@@ -266,11 +266,11 @@ std::pair<TFitResultPtr, TFitResultPtr> FitPeaksWithTSpectrum(TH1D *hist, double
             }
         }
         else if (energy == 220) {
-            bins_fit_p = 1;
-            if (layer = "X" && (barNumber == 0 || barNumber == 18 || barNumber == 4)) {
+            bins_fit_p = 2;
+            if (layer == "X" && (barNumber == 0 || barNumber == 18 || barNumber == 4)) {
                 bins_fit_p = 3;
             }
-            else if (layer == "Y" && (barNumber == 1 || barNumber == 14 || barNumber == 15 || barNumber == 18 || barNumber == 19)) {
+            else if (layer == "Y" && (barNumber == 1 || barNumber == 8 || barNumber == 14 || barNumber == 15 || barNumber == 18 || barNumber == 19)) {
                 bins_fit_p = 3;
             }
         }
@@ -385,36 +385,36 @@ std::pair<TFitResultPtr, TFitResultPtr> FitPeaksWithTSpectrum(TH1D *hist, double
             if (layer == "X") {
                 if (barNumber == 0) {
                     x2 = 6.9;
-                    bins_fit_he = 1;
+                    bins_fit_he = 8;
                 }
                 else if (barNumber == 1) {
                     x2 = 7.8;
-                    bins_fit_he = 27;
+                    bins_fit_he = 8;
                 }
                 else if (barNumber == 3) {
                     bins_fit_he = 6;
                 }
                 else if (barNumber == 4) {
-                    bins_fit_he = 25;
+                    bins_fit_he = 8;
                 }
                 else if (barNumber == 18 || barNumber == 19) {
-                    bins_fit_he = 14;
+                    bins_fit_he = 5;
                     if (barNumber == 19) {
-                        bins_fit_he = 25;
-                        x2 = 5.65;
+                        bins_fit_he = 7;
+                        x2 = 5.7;
                     }
                 }
             }
             else if (layer == "Y") {
                 if (barNumber == 0) {
-                    x2 = 6.35;
-                    bins_fit_he = 25;
+                    x2 = 6.0;
+                    bins_fit_he = 7;
                 }
                 else if (barNumber == 1) {
-                    bins_fit_he = 8;
+                    bins_fit_he = 7;
                 }
                 else if (barNumber == 2) {
-                    bins_fit_he = 22;
+                    bins_fit_he = 6;
                 }
                 else if (barNumber == 6 || barNumber == 7) {
                     bins_fit_he = 3;
@@ -422,11 +422,15 @@ std::pair<TFitResultPtr, TFitResultPtr> FitPeaksWithTSpectrum(TH1D *hist, double
                 else if (barNumber > 14) {
                     bins_fit_he = 10;
                     if (barNumber == 15 || barNumber == 16) {
-                        bins_fit_he = 18;
+                        bins_fit_he = 8;
+                    }
+                    else if (barNumber == 17)
+                    {
+                        bins_fit_he = 7;
                     }
                     else if (barNumber == 19) {
-                        x2 = 7.2;
-                        bins_fit_he = 20;
+                        x2 = 6.9;
+                        bins_fit_he = 10;
                     }
                 }
             }

@@ -5,9 +5,12 @@
 #include <TCanvas.h>
 #include <TGraphErrors.h>
 #include <iostream>
+#include <map>
+#include <vector>
+#include <cmath>
 #include <sstream>
 #endif
 
 std::string ConvertFileNumbersToString(const std::vector<int>& energies);
 
-pair<double, double> RoundMeasurement(double value, double uncertainty);
+std::pair<double, double> RoundMeasurement(double value, double uncertainty);
