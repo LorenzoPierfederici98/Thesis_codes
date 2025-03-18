@@ -10,12 +10,17 @@
 #include <string>
 #endif
 
+
 TH1D* getElossByBar(TFile* file, const std::string &dirName, const TString &desiredHistName);
 
 TH1D* getTofByBar(TFile* file, const std::string &dirName, const TString &desiredHistName);
 
-void ElossNormalizedHistograms(TH1* hData, TH1* hMC, const TString &ElossTitle, const TString &ElossCanvasName);
+void ElossNormalizedHistograms(TH1* hDataRaw, TH1* hData, TH1* hMC, const TString &ElossTitle, const TString &ElossCanvasName);
 
-void TofNormalizedHistograms(TH1* hTofData, TH1* hTofMC, const TString &TofTitle, const TString &TofCanvasName);
+void TofNormalizedHistograms(TH1* hTofDataRaw, TH1* hTofData, TH1* hTofMC, const TString &TofTitle, const TString &TofCanvasName);
 
-void ProcessFile(const std::string &dataFile, const std::string &mcFile, int energy, const std::string &layer, int bar);
+void ProcessFile(const std::string &dataFileRaw, const std::string &dataFile, const std::string &mcFile, int energy, const std::string &layer, int bar);
+
+std::map<std::string, std::map<int, double>> extractBarData();
+
+std::map<int, std::map<int, double>> extractTofData(int energy);
