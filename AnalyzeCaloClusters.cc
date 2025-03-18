@@ -212,6 +212,8 @@ void AnalyzeCaloClusters(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
             Int_t ModuleID = crystal_id / kCrysPerModule;
             TVector3 CaloPosition = hit_ca->GetPosition();
 
+            Charge_Calo_crystal_noCuts[crystal_id]->Fill(charge_calo);
+
             if (charge_calo > 0.02)
             {
                 //Charge_Calo_total->Fill(charge_calo);
@@ -290,6 +292,8 @@ void AnalyzeCaloClusters(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
                 //cout << "event: " << ev << " cluster size = 2" << endl;
                 std::vector<int> crystal_ids;
                 std::vector<double> charge_values;
+                Double_t charge_sum = 0;
+                Double_t charge_sum_calibrated = 0;
                 for (int iclusterhit = 0; iclusterhit < nClusterHits; iclusterhit++)
                 {
                     TACAhit *hit = cluster->GetHit(iclusterhit);
@@ -300,7 +304,7 @@ void AnalyzeCaloClusters(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
                     Int_t ModuleID = crystal_id / kCrysPerModule;
                     Double_t charge_clusterHit = hit->GetCharge();
 
-                    if (charge_clusterHit > 0.02) Charge_Calo_nonCalibrated->Fill(charge_clusterHit);
+                    if (charge_clusterHit > 0.02) charge_sum += charge_clusterHit;
 
                     // The find() method returns an iterator to the matching element if found, or end() if not found.
                     if ((crystal_id == 0 || calibCoeff.find(crystal_id) != calibCoeff.end()) && charge_clusterHit > 0.02)
@@ -309,8 +313,7 @@ void AnalyzeCaloClusters(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
                         //cout << "normalizing its charge to crystal 0.." << endl;
                     
                         if (crystal_id != 0) charge_clusterHit = charge_clusterHit / calibCoeff.at(crystal_id);
-                        // prendere somma dei cristalli
-                        Charge_Calo_Calibrated->Fill(charge_clusterHit);
+                        charge_sum_calibrated += charge_clusterHit;
                     }
                     else if (crystal_id != 0 && calibCoeff.find(crystal_id) == calibCoeff.end())
                     {
@@ -323,6 +326,9 @@ void AnalyzeCaloClusters(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
                         charge_values.push_back(charge_clusterHit);
                     }
                 }
+
+                Charge_Calo_nonCalibrated->Fill(charge_sum);
+                Charge_Calo_Calibrated->Fill(charge_sum_calibrated);
 
                 if (crystal_ids.size() == 2)
                 {
@@ -515,6 +521,7 @@ void BookHistograms()
     for (int icrystal = 0; icrystal < kModules * kCrysPerModule; icrystal++)
     {
         Charge_Calo_crystal[icrystal] = new TH1D(Form("Charge_Calo_crystalId_%d", icrystal), Form("Charge_Calo_crystalID_%d", icrystal), 500, -0.2, 1.);
+        Charge_Calo_crystal_noCuts[icrystal] = new TH1D(Form("noCuts_Charge_Calo_crystalId_%d", icrystal), Form("No Cuts Charge Calo crystalID %d", icrystal), 500, -0.2, 1.);
 
         // hClusterSize_Charge[icrystal] = new TH2D(Form("ClusterSize_Charge_crystalId_%d", icrystal), Form("Cluster-Size vs Norm.Charge crystalId %d", icrystal), 100, -0.2, 1.1, 30, 0.5, 6.5);
         ClusterCharge_Calo_crystal[icrystal] = new TH1D(Form("ClusterCharge_Calo_crystalId_%d", icrystal), Form("Cluster Size 1: Charge crystalID %d", icrystal), 500, -0.2, 1.1);

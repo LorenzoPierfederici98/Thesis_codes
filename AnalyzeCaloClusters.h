@@ -195,6 +195,7 @@ TH1D *Charge_Calo_nonCalibrated;
 TH1D *Charge_Calo_Calibrated;
 //TH1D *Charge_Calo_Module[kModules];  //charge per module in calo
 TH1D *Charge_Calo_crystal[kModules * kCrysPerModule];  //charge per crystal id in calo
+TH1D *Charge_Calo_crystal_noCuts[kModules * kCrysPerModule];
 TH1D *ClusterCharge_Calo_crystal[kModules * kCrysPerModule];
 std::map<Int_t, TH1D*> minCharge;  // Min charge for every cluster size
 
