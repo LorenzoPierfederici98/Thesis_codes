@@ -24,7 +24,7 @@ void CompareCalibrated() {
         {"MC/TW/AnaFOOT_TW_DecodedMC_HIT2022_MC_220.root", 220}
     };
 
-    //std::map<std::string, std::map<int, double>> calibCoeff = extractBarData();
+    std::map<std::string, std::map<int, double>> calibCoeff = extractBarData();
 
     // Define the two layers.
     std::vector<std::string> layers = {"X", "Y"};
@@ -39,7 +39,11 @@ void CompareCalibrated() {
                 std::string dataFile = filesAndEnergies[i].first;
                 std::string mcFile   = filesAndEnergiesMC[i].first;
 
-                //std::map<int, std::map<int, double>> tofCoeff = extractTofData(energy);
+                std::map<int, std::map<int, double>> tofCoeff = extractTofData(energy);
+                cout << "Processing energy: " << energy << " MeV/u Layer " << layer.c_str() << " bar " << bar << endl;
+
+                cout << "Calibrated eloss = Q*1/p0, 1/p0 = " << calibCoeff.at(layer).at(bar) << " MeV/a.u." << endl;
+                cout << "Calibrated tof = raw tof - Delta_t, Delta_t = " << tofCoeff.at(0).at(bar) << " ns" << endl;
                 
                 // Process the file combination: retrieve histograms and draw them.
                 ProcessFile(dataFileRaw, dataFile, mcFile, energy, layer, bar);
@@ -126,6 +130,7 @@ void ElossNormalizedHistograms(TH1* hDataRaw, TH1* hData, TH1* hMC, const TStrin
         delete c;
         return;
     }
+    c->SetMargin(0.1, 0.1, 0.15, 0.15);
 
     hDataRaw->SetLineColor(kBlack);
     hData->SetLineColor(kBlue);
@@ -144,7 +149,15 @@ void ElossNormalizedHistograms(TH1* hDataRaw, TH1* hData, TH1* hMC, const TStrin
     //minY *= 0.5;
 
     hData->GetYaxis()->SetRangeUser(minY, maxY);
-    hData->GetXaxis()->SetTitle("Eloss [MeV]");
+    hData->GetXaxis()->SetTitle("Energy loss [MeV] - Q [a.u.]");
+    hData->GetYaxis()->SetTitle("Entries");
+    hData->SetTitleSize(0.1, "T");
+    hData->GetXaxis()->SetTitleSize(0.05);
+    hData->GetYaxis()->SetTitleSize(0.05);
+
+    hData->SetLineWidth(2);
+    hDataRaw->SetLineWidth(2);
+    hMC->SetLineWidth(2);
     
     // Draw histograms normalized (without modifying the original bin contents)
     hData->Draw();
@@ -152,11 +165,11 @@ void ElossNormalizedHistograms(TH1* hDataRaw, TH1* hData, TH1* hMC, const TStrin
     hMC->Draw("HIST SAME");
     
     // Build a legend to distinguish the histograms
-    TLegend *leg = new TLegend(0.68, 0.8, 0.9, 0.9);
+    TLegend *leg = new TLegend(0.65, 0.7, 0.95, 0.85);
     leg->AddEntry(hData, "SHOE Calib. Eloss", "l");
     leg->AddEntry(hDataRaw, "Raw Eloss #sqrt{Q_{A}Q_{B}}", "l");
     leg->AddEntry(hMC, "MC", "l");
-    leg->SetTextSize(0.028);
+    leg->SetTextSize(0.04);
     leg->Draw();
 
     TString plotName = ElossCanvasName;
@@ -171,6 +184,7 @@ void ElossNormalizedHistograms(TH1* hDataRaw, TH1* hData, TH1* hMC, const TStrin
 
 void TofNormalizedHistograms(TH1* hTofDataRaw, TH1* hTofData, TH1* hTofMC, const TString &TofTitle, const TString &TofCanvasName) {
     TCanvas *c = new TCanvas(TofCanvasName.Data(), TofTitle.Data(), 800, 600);
+    c->SetMargin(0.1, 0.1, 0.15, 0.15); // Left, Right, Bottom, Top margins
     //c->SetGrid();
     if (!hTofData || !hTofMC) {
         std::cerr << "One or both histograms are null for canvas " << TofCanvasName.Data() << std::endl;
@@ -196,17 +210,26 @@ void TofNormalizedHistograms(TH1* hTofDataRaw, TH1* hTofData, TH1* hTofMC, const
 
     hTofData->GetYaxis()->SetRangeUser(minY, maxY);
     hTofData->GetXaxis()->SetTitle("TOF [ns]");
+    hTofData->GetYaxis()->SetTitle("Entries");
+    gStyle->SetTitleSize(0.08, "T");
+
+    hTofData->GetXaxis()->SetTitleSize(0.05);
+    hTofData->GetYaxis()->SetTitleSize(0.05);
     // Draw histograms normalized (without modifying the original bin contents)
+    hTofData->SetLineWidth(2);
+    hTofDataRaw->SetLineWidth(2);
+    hTofMC->SetLineWidth(2);
+
     hTofData->Draw();
     hTofDataRaw->Draw("HIST SAME");
     hTofMC->Draw("HIST SAME");
     
     // Build a legend to distinguish the histograms
-    TLegend *leg = new TLegend(0.68, 0.8, 0.9, 0.9);
+    TLegend *leg = new TLegend(0.65, 0.7, 0.95, 0.85);
     leg->AddEntry(hTofData, "SHOE Calib. TOF", "l");
     leg->AddEntry(hTofDataRaw, "Raw TOF T_{bar} - T_{SC}", "l");
     leg->AddEntry(hTofMC, "MC", "l");
-    leg->SetTextSize(0.028);
+    leg->SetTextSize(0.04);
     leg->Draw();
 
     TString plotName = TofCanvasName;
@@ -233,7 +256,6 @@ void ProcessFile(const std::string &dataFileRaw, const std::string &dataFile, co
     TString histNameElossRaw = TString::Format("Charge_Layer%s_bar%d", layer.c_str(), bar);
     TString histNameTof = TString::Format("ToF_Layer%s_bar%d", layer.c_str(), bar);
 
-    cout << "Processing energy: " << energy << " MeV/u Layer " << layer.c_str() << " bar " << bar << endl;
     
     TFile *dataRawFilePtr = TFile::Open(dataFileRaw.c_str(), "READ");
     if (!dataRawFilePtr || dataRawFilePtr->IsZombie()) {
@@ -270,9 +292,9 @@ void ProcessFile(const std::string &dataFileRaw, const std::string &dataFile, co
     TH1D *hTofMC = getTofByBar(mcFilePtr, tofDirMC.Data(), histNameTof.Data());
     
     // Create a title and canvas name that include layer, bar, and energy.
-    TString ElossTitle = TString::Format("Calibrated And Raw Eloss-MC layer %s bar %d @ %d MeV/u", layer.c_str(), bar, energy);
+    TString ElossTitle = TString::Format("Raw, calibrated and MC Eloss layer %s bar %d @ %d MeV/u", layer.c_str(), bar, energy);
     TString ElossCanvasName = TString::Format("c_Eloss_Layer%s_bar%d_%dMeV", layer.c_str(), bar, energy);
-    TString TofTitle = TString::Format("Calibrated And Raw TOF layer %s bar %d @ %d MeV/u", layer.c_str(), bar, energy);
+    TString TofTitle = TString::Format("Raw, calibrated and MC TOF layer %s bar %d @ %d MeV/u", layer.c_str(), bar, energy);
     TString TofCanvasName = TString::Format("c_Tof_Layer%s_bar%d_%dMeV", layer.c_str(), bar, energy);
 
     hData->SetTitle(ElossTitle.Data());
@@ -314,12 +336,11 @@ void ProcessFile(const std::string &dataFileRaw, const std::string &dataFile, co
 std::map<std::string, std::map<int, double>> extractBarData() {
     std::map<std::string, std::map<int, double>> barData;
     std::string path = "../shoe/build/Reconstruction/calib/HIT2022/";
-    std::string filename = "TATW_Energy_calibration_perBar_4742.cal"; // File is hardcoded
-    filename = path + filename;
-    std::ifstream file(filename);
+    std::string filename = "TATW_Energy_Calibration_perBar_4742.cal"; // File is hardcoded
+    std::ifstream file(path + filename);
 
     if (!file.is_open()) {
-        std::cerr << "Error opening file: " << filename << std::endl;
+        std::cerr << "Error opening file: " << path + filename << std::endl;
         return barData;
     }
 
@@ -347,15 +368,14 @@ std::map<int, std::map<int, double>> extractTofData(int energy) {
     std::map<int, std::map<int, double>> tofData;
     std::string filename;
     std::string path = "../shoe/build/Reconstruction/calib/HIT2022/";
-    if (energy == 100) filename = "calib/HIT2022/TATW_Tof_Calibration_perBar_4766.cal";
-    else if (energy == 140) filename = "calib/HIT2022/TATW_Tof_Calibration_perBar_4801.cal";
-    else if (energy == 200) filename = "calib/HIT2022/TATW_Tof_Calibration_perBar_4742.cal";
-    else if (energy == 220) filename = "calib/HIT2022/TATW_Tof_Calibration_perBar_4828.cal";
-    filename = path + filename;
-    std::ifstream file(filename);
+    if (energy == 100) filename = "TATW_Tof_Calibration_perBar_4766.cal";
+    else if (energy == 140) filename = "TATW_Tof_Calibration_perBar_4801.cal";
+    else if (energy == 200) filename = "TATW_Tof_Calibration_perBar_4742.cal";
+    else if (energy == 220) filename = "TATW_Tof_Calibration_perBar_4828.cal";
+    std::ifstream file(path + filename);
   
     if (!file.is_open()) {
-        std::cerr << "Error opening file: " << filename << std::endl;
+        std::cerr << "Error opening file: " << path + filename << std::endl;
         return tofData;
     }
   

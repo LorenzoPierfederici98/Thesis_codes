@@ -150,7 +150,7 @@ void SaveFitResultsToFile(TCanvas *canvas, TH1D *hist, TFitResultPtr fitResult, 
     }
 
     canvas->cd();
-    gPad->SetLogy();
+    //gPad->SetLogy();
     canvas->Update();
     hist->Write(hist->GetName(), TObject::kOverwrite);
     canvas->Write(Form("Canvas_Crystal_%s", hist->GetName()),  TObject::kOverwrite);

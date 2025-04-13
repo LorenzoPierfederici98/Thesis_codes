@@ -31,7 +31,7 @@ void CalibrateFragm() {
     }
 
     std::map<TString, double> fitValues = PlotFitResultsCombined(fitMeansP, fitErrorsP, fitMeansHe, fitErrorsHe, elossP, elossHe);
-    WriteFitValuesOrdered(fitValues);
+    //WriteFitValuesOrdered(fitValues);
 }
 
 void ProcessFile(const TString& fileName, 
@@ -176,8 +176,10 @@ std::map<TString, double> PlotFitResultsCombined(
             }
 
             graphProtons->SetMarkerStyle(20);
+            graphProtons->SetMarkerSize(1.5);
             graphProtons->SetMarkerColor(kBlue);
             graphHeliums->SetMarkerStyle(20);
+            graphHeliums->SetMarkerSize(1.5);
             graphHeliums->SetMarkerColor(kRed);
 
             multiGraph->Add(graphProtons, "P");
@@ -186,12 +188,16 @@ std::map<TString, double> PlotFitResultsCombined(
             TCanvas* c = new TCanvas(Form("c_%s", layerBarName.Data()), 
                                       Form("Fit Results - %s", layerBarName.Data()), 
                                       800, 600);
+            c->SetMargin(0.12, 0.12, 0.15, 0.15); // Left, Right, Bottom, Top margins
 
             multiGraph->SetTitle(Form("%s - fit results calibration", layerBarName.Data()));
-            multiGraph->GetXaxis()->SetTitle("Energy loss MC [MeV]");
-            multiGraph->GetYaxis()->SetTitle("Mean Charge [a.u.]");
+            multiGraph->GetXaxis()->SetTitle("#Delta E_{MC} [MeV]");
+            multiGraph->GetYaxis()->SetTitle("#mu(Q) [a.u.]");
             multiGraph->SetMinimum(0.);
             multiGraph->GetXaxis()->SetLimits(0., 15.);
+            gStyle->SetTitleSize(0.07, "T");
+            multiGraph->GetXaxis()->SetTitleSize(0.05);  // X-axis title size
+            multiGraph->GetYaxis()->SetTitleSize(0.05);  // Y-axis title size
             multiGraph->Draw("A");
 
             // Combine data for fitting
@@ -243,10 +249,13 @@ std::map<TString, double> PlotFitResultsCombined(
             combinedFit->Draw("same");
 
             // Add legend
-            TLegend* legend = new TLegend(0.45, 0.25, 0.9, 0.50);
+            TLegend* legend = new TLegend(0.45, 0.25, 0.92, 0.50);
             legend->AddEntry(graphProtons, "Protons", "p");
             legend->AddEntry(graphHeliums, "Heliums", "p");
             auto [p0, p0Error] = RoundMeasurement(combinedFit->GetParameter(0), combinedFit->GetParError(0));
+            double p0_val = std::stod(p0);
+            double p0Error_val = std::stod(p0Error);
+            cout << layerBarName.Data() << " 1/p0: " << 1./p0_val << " +/- " << p0Error_val / (p0_val * p0_val) << endl;
             //auto [p1, p1Error] = RoundMeasurement(combinedFit->GetParameter(1), combinedFit->GetParError(1));
             //auto [p2, p2Error] = RoundMeasurement(combinedFit->GetParameter(2), combinedFit->GetParError(2));
             //auto [p3, p3Error] = RoundMeasurement(combinedFit->GetParameter(3), combinedFit->GetParError(3));
@@ -256,7 +265,7 @@ std::map<TString, double> PlotFitResultsCombined(
             //legend->AddEntry((TObject*)0, Form("p_{1} = %s#pm%s", p1.c_str(), p1Error.c_str()), "");
             //legend->AddEntry((TObject*)0, Form("p_{2} = %s#pm%s", p2.c_str(), p2Error.c_str()), "");
             //legend->AddEntry((TObject*)0, Form("p_{3} = %s#pm%s", p3.c_str(), p3Error.c_str()), "");
-            legend->SetTextSize(0.03);
+            legend->SetTextSize(0.035);
             legend->Draw();
 
             c->SaveAs(Form("Plots/cuts/Fragmentation_%s.png", layerBarName.Data()));

@@ -28,6 +28,7 @@ void CaloPeakEnergyDisplay() {
 
     for (int crystalID = 0; crystalID < 63; crystalID++) {
         TCanvas *canvas = new TCanvas("canvas", "Calo Fit Results vs Energies", 800, 600);
+        canvas->SetMargin(0.13, 0.12, 0.15, 0.15);
         TGraphErrors* graph = new TGraphErrors();
         int pointIndex = 0;
         for (const auto& [fileName, energy] : filesAndEnergies) {
@@ -71,30 +72,43 @@ void CaloPeakEnergyDisplay() {
 
             graph->SetTitle(Form("Beam Energies HE: %s MeV/u | Crystal ID: %d", energiesStr.c_str(), crystalID));
             graph->SetMarkerStyle(24);
-            graph->SetMarkerSize(1.2);
+            graph->SetMarkerSize(1.5);
             graph->GetXaxis()->SetTitle("Beam Energy [MeV/u]");
             graph->GetYaxis()->SetTitle("Mean Charge [a.u.]");
+            gStyle->SetTitleSize(0.07, "T");
+            graph->GetXaxis()->SetTitleSize(0.05);
+            graph->GetYaxis()->SetTitleSize(0.05);
             graph->SetMinimum(0.0);
             graph->GetXaxis()->SetLimits(0., graph->GetXaxis()->GetXmax());
 
             //f1->SetParameter(0, intercept);
             f1->SetParameter(0, slope);
 
-            TPaveText *fitInfo = new TPaveText(0.3, 0.7, 0.45, 0.85, "NDC");
+            double ratio, ratio_error;
+
+            TPaveText *fitInfo = new TPaveText(0.4, 0.7, 0.5, 0.8, "NDC");
             fitInfo->SetFillColor(0);
-            //fitInfo->AddText(Form("Intercept [a.u.] = %f#pm %f", intercept, sigma_intercept));
-            fitInfo->AddText(Form("Slope [a.u. / MeV] = %f#pm %f", slope, sigma_slope));
-            //fitInfo->AddText(Form("#chi^{2} / ndf = %.2f / %d", chi2, ndf));
-            fitInfo->SetTextSize(0.03);
 
             if (crystalID == 0) {
                 reference_slope = slope;
                 reference_error = sigma_slope;
             } else {
-                double ratio = slope / reference_slope;
-                double ratio_error = ratio * sqrt(pow(sigma_slope / slope, 2) + pow(reference_error / reference_slope, 2));
+                ratio = slope / reference_slope;
+                ratio_error = ratio * sqrt(pow(sigma_slope / slope, 2) + pow(reference_error / reference_slope, 2));
                 slopeRatios[crystalID] = {ratio, ratio_error};
             }
+
+            if (crystalID == 0)
+            {
+                fitInfo->AddText(Form("Slope crystal ID 0 [a.u. / MeV] = %f#pm%f", slope, sigma_slope));
+            }
+            else
+            {
+                fitInfo->AddText(Form("Slope crystal ID %d / slope crystal ID 0 = %f#pm%f", crystalID, ratio, ratio_error));
+            }
+            //fitInfo->AddText(Form("Intercept [a.u.] = %f#pm %f", intercept, sigma_intercept));
+            //fitInfo->AddText(Form("#chi^{2} / ndf = %.2f / %d", chi2, ndf));
+            fitInfo->SetTextSize(0.03);
 
             // Draw fit info
             graph->Draw("AP");
