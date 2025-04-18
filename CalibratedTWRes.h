@@ -190,18 +190,20 @@ typedef std::vector<std::pair<Int_t,Int_t> > TVecPair;
 // TH1F*           fpHisSeedMap[MaxPlane];    ///< seed map
 // TH1F*           fpHisStripMap[MaxPlane];   ///< strip map
 
+TH1D *Eloss;
+TH1D *Eloss_noCuts;
+TH1D *Tof;
+TH1D *Tof_noCuts;
 TH2D *dE_vs_tof;
 TH2D *dE_vs_tof_Z1;
 TH2D *dE_vs_tof_Z2;
 TH2D *beta_vs_dE;
 TH1D *Eloss_perBar[kLayers][nBarsPerLayer];
 TH1D *Eloss_perBar_noCuts[kLayers][nBarsPerLayer];
-TH1D *My_eloss[kLayers][nBarsPerLayer];
 TH1D *My_eloss_noCuts[kLayers][nBarsPerLayer];
 TH1D *Charge_perBar[kLayers][nBarsPerLayer];
 TH1D *Charge_perBar_noCuts[kLayers][nBarsPerLayer];
 TH1D *hToF[kLayers][nBarsPerLayer];
-TH1D *MyhToF[kLayers][nBarsPerLayer];
 TH1D *hToF_noCuts[kLayers][nBarsPerLayer];
 TH1D *PosX;  //bar hit position in layerX
 TH1D *PosY;  //bar hit position in layerY
@@ -225,9 +227,9 @@ void  ProjectTracksOnTw(int Z, TVector3 init_pos, TVector3 init_p);
 void  LoopOverMCtracks(Int_t Emin, Int_t Emax, Bool_t isnotrig);
 void  AdjustHistoRange(TH1D *Histo);
 void SetTitleAndLabels(TObject* obj, const char* title, const char* xLabel, const char* yLabel);
+Double_t CalculateZ(Double_t dE, Double_t beta);
 std::map<Int_t, std::map<Int_t, Double_t>> extractBarData();
 std::map<Int_t, std::map<Int_t, Double_t>> extractTofData(Int_t energy);
-Double_t CalculateZ(Double_t dE, Double_t beta);
 
 Bool_t IsVTregion(int reg);
 

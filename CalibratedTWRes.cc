@@ -4,10 +4,10 @@
 // and run with (for example): root -l -b -q AnalyzeFOOT.cc++g\(\"../../../../rootfiles/outMC_16O_C_400_1_GSI.root\",1,10,\"\"\)
 // sul tier1:  root -l -b -q AnalyzeFOOT.cc++g\(\"/storage/gpfs_data/foot/mtoppi/DataDecoded/CNAO2023/test.root\",0,1000,\"testAnaFOOT\",\"/storage/gpfs_data/foot/mtoppi/OutputMacro/\"\)
 
-#include "CalibratedTW.h"
+#include "CalibratedTWRes.h"
 
 // main
-void CalibratedTW(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t nev = 10, TString outfile = "AnaFOOT.root", TString outDir = "/Users/marco/FOOT/Analisi/shoe/build/Reconstruction/OutputMacro")
+void CalibratedTWRes(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t nev = 10, TString outfile = "AnaFOOT.root", TString outDir = "/Users/marco/FOOT/Analisi/shoe/build/Reconstruction/OutputMacro")
 
 {
 
@@ -185,7 +185,6 @@ void CalibratedTW(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t n
   Int_t pointIndex_bar9_layerY_filtered = 0;
 
   Double_t d_SC_TW = 1.439;  // distance between SC and TW, in m
-  //Double_t d_SC_TW = 0.95183;
   Double_t bar_density = 1.023;  // density of the bars in g/cm^3
   Double_t bar_thickness = 0.3;  // thickness of the bars in cm
 
@@ -495,17 +494,17 @@ void CalibratedTW(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t n
       PosX->Fill(posAlongX);
       PosY->Fill(posAlongY);
       hTwMapPos->Fill(posAlongX, posAlongY);
-
       Charge_perBar[(Int_t)LayerX][barX]->Fill(QBarX);
       Charge_perBar[(Int_t)LayerY][barY]->Fill(QBarY);
       Eloss_perBar[(Int_t)LayerX][barX]->Fill(elossX);
       Eloss_perBar[(Int_t)LayerY][barY]->Fill(elossY);
-      My_eloss[(Int_t)LayerX][barX]->Fill(myelossX);
-      My_eloss[(Int_t)LayerY][barY]->Fill(myelossY);
       hToF[(Int_t)LayerX][barX]->Fill(tofX);
       hToF[(Int_t)LayerY][barY]->Fill(tofY);
-      MyhToF[(Int_t)LayerX][barX]->Fill(mytofX);
-      MyhToF[(Int_t)LayerY][barY]->Fill(mytofY);
+
+      Eloss->Fill(elossX);
+      Eloss->Fill(elossY);
+      Tof->Fill(tofX);
+      Tof->Fill(tofY);
     }
 
     Int_t nHits = twNtuHit->GetHitN();
@@ -550,8 +549,10 @@ void CalibratedTW(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t n
         Eloss_perBar_noCuts[layer][bar]->Fill(eloss);
         hToF_noCuts[layer][bar]->Fill(tof);
         //beta_vs_dE->Fill(beta, mass_stopping_power);
-        My_eloss_noCuts[layer][bar]->Fill(myeloss);
         //betaEloss->SetPoint(pointIndex++, beta, mass_stopping_power);
+
+        Eloss_noCuts->Fill(eloss);
+        Tof_noCuts->Fill(tof);
 
         if (ev % 10000 == 0) {
           cout << "Charge layer " << layer << " bar " << bar << " calib.coefficient (1/p0): " << calibCoeff.at(layer).at(bar) << endl;
@@ -773,6 +774,11 @@ void BookHistograms(TDirectory *DirChargeElossLayerX, TDirectory *DirChargeEloss
 
   Z_reco = new TH1D("Z_reco", "Reconstructed Z", 500, 0., 5.);
 
+  Eloss = new TH1D("Eloss", "SHOE Calibrated Energy Loss", 200, 0., 20.);
+  Eloss_noCuts = new TH1D("Eloss_noCuts", "No Cuts SHOE Calibrated Energy Loss", 200, 0., 20.);
+  Tof = new TH1D("ToF", "SHOE Calibrated TOF", 220, 6., 20.);
+  Tof_noCuts = new TH1D("ToF_noCuts", "No Cuts ToF", 220, 6., 20.);
+
   for (int ilay = 0; ilay < kLayers; ilay++)
   {
 
@@ -785,10 +791,7 @@ void BookHistograms(TDirectory *DirChargeElossLayerX, TDirectory *DirChargeEloss
       Eloss_perBar_noCuts[ilay][ibar] = new TH1D(Form("noCuts_Eloss_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("No Cuts SHOE Calibrated Energy Loss %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 200, 0., 20.);
       Eloss_perBar[ilay][ibar] = new TH1D(Form("Eloss_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("SHOE Calibrated Energy Loss %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 200, 0., 20.);
       hToF[ilay][ibar] = new TH1D(Form("ToF_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("ToF %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 220, 6., 20.);
-      MyhToF[ilay][ibar] = new TH1D(Form("MyToF_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Pisa Calibrated ToF %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 220, 6., 20.);
       hToF_noCuts[ilay][ibar] = new TH1D(Form("noCuts_ToF_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("No Cuts TOF %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 220, 6., 20.);
-      My_eloss_noCuts[ilay][ibar] = new TH1D(Form("noCuts_MyEloss_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("No Cuts Pisa Calibrated Energy Loss %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 200, 0., 20.);
-      My_eloss[ilay][ibar] = new TH1D(Form("MyEloss_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Pisa Calibrated Energy Loss %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 200, 0., 20.);
       if (ilay == (Int_t)LayerX)
       {
         Charge_perBar[ilay][ibar]->SetDirectory(DirChargeElossLayerX);
@@ -796,10 +799,7 @@ void BookHistograms(TDirectory *DirChargeElossLayerX, TDirectory *DirChargeEloss
         Eloss_perBar_noCuts[ilay][ibar]->SetDirectory(DirChargeElossLayerX);
         Eloss_perBar[ilay][ibar]->SetDirectory(DirChargeElossLayerX);
         hToF[ilay][ibar]->SetDirectory(DirToFLayerX);
-        MyhToF[ilay][ibar]->SetDirectory(DirToFLayerX);
         hToF_noCuts[ilay][ibar]->SetDirectory(DirToFLayerX);
-        My_eloss[ilay][ibar]->SetDirectory(DirChargeElossLayerX);
-        My_eloss_noCuts[ilay][ibar]->SetDirectory(DirChargeElossLayerX);
       }
       else
       {
@@ -808,10 +808,7 @@ void BookHistograms(TDirectory *DirChargeElossLayerX, TDirectory *DirChargeEloss
         Eloss_perBar_noCuts[ilay][ibar]->SetDirectory(DirChargeElossLayerY);
         Eloss_perBar[ilay][ibar]->SetDirectory(DirChargeElossLayerY);
         hToF[ilay][ibar]->SetDirectory(DirToFLayerY);
-        MyhToF[ilay][ibar]->SetDirectory(DirToFLayerY);
         hToF_noCuts[ilay][ibar]->SetDirectory(DirToFLayerY);
-        My_eloss[ilay][ibar]->SetDirectory(DirChargeElossLayerY);
-        My_eloss_noCuts[ilay][ibar]->SetDirectory(DirChargeElossLayerY);
       }
     }
   }
