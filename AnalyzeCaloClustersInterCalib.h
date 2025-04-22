@@ -194,6 +194,12 @@ TH1D *Charge_Calo_total;  //charge in all calo
 // Non calibrated and calibrated charge hist. form cluster size 2 and a single cluster
 TH1D *Charge_Calo_nonCalibrated; 
 TH1D *Charge_Calo_Calibrated;
+TH1D *Charge_Calo_Calibrated_q;
+TH1D *Charge_Calo_Calibrated_q_0_1;
+TH1D *Charge_Calo_Calibrated_q_0_6;
+TH1D *Charge_Calo_Calibrated_q_intercalib;
+TH1D *Charge_Calo_Calibrated_q_intercalib_0_1;
+TH1D *Charge_Calo_Calibrated_q_intercalib_0_6;
 //TH1D *Charge_Calo_Module[kModules];  //charge per module in calo
 TH1D *Charge_Calo_crystal[kModules * kCrysPerModule];  //charge per crystal id in calo
 TH1D *Charge_Calo_crystal_noCuts[kModules * kCrysPerModule];
@@ -208,10 +214,15 @@ TH1D *Clusters_number;
 TH2D *hClusterSize_Charge[kModules * kCrysPerModule];
 TH2D *Correlated_ClusterCharge[kCrysPerModule][kCrysPerModule];
 TH2D *MinCharge_ClusterSize;
-//TH2D *hCalClusterPos[max_cluster_number];
 
-TH2D *hCalMapPos[kModules];  //2D histogram of x, y positions in the calorimeter
-TH2D *hCalMapCrystalID[kModules];  //2D histogram of crystalID in modules
+// A small struct to hold fit results
+struct FitResult {
+    bool success;
+    double p0;     // Intercept
+    double p1;     // Slope
+    double p0err;  // Error on intercept
+    double p1err;  // Error on slope
+};
 
 void  InitializeContainers();
 void  BookHistograms();
@@ -221,6 +232,7 @@ void  SetTreeBranchAddress(TAGactTreeReader *treeReader);
 void  ProjectTracksOnTw(int Z, TVector3 init_pos, TVector3 init_p);
 void SetTitleAndLabels(TObject* obj, const char* title, const char* xLabel, const char* yLabel);
 std::map<Int_t, Double_t> extractCrystalData();
+std::pair<FitResult, TGraph*> FitScatterPlot(TGraph *graph, Int_t i, Int_t j, Double_t maxX, Double_t maxY, Double_t energy);
 
 Bool_t IsVTregion(int reg);
 

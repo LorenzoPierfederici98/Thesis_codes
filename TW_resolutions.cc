@@ -72,25 +72,28 @@ void FitHistograms(
             hist->Draw();
 
             TFitResultPtr fitResult = FitWithTSpectrum(hist, energy);
+            //FitStats statsEloss = FitResampling(hist, energy, fitResult->Parameter(1), fitResult->Parameter(2));
 
-            double meanElossHe;
-            double meanElossErrHe;
-            double stdElossHe;
-            double stdElossErrHe;
+            double meanElossHe = fitResult->Parameter(1);
+            double meanElossErrHe = fitResult->Error(1);
+            //double meanElossErrHe = statsEloss.stddevOfMean;
+            double stdElossHe = fitResult->Parameter(2);
+            double stdElossErrHe = fitResult->Error(2);
+            //double stdElossErrHe = statsEloss.stddevOfSigmas;
+
             double R_He;
             double R_He_err;
 
             if (fitResult.Get() != nullptr) {
-                meanElossHe = fitResult->Parameter(1);
-                meanElossErrHe = fitResult->Error(1);
-                stdElossHe = fitResult->Parameter(2);
-                stdElossErrHe = fitResult->Error(2);
-
                 double cov_mu_sigma_He = fitResult->CovMatrix(1, 2);
+                if (meanElossErrHe > 0.000045) meanElossErrHe = 0.0001;
+                if (stdElossErrHe > 0.000045) stdElossErrHe = 0.0001;
+
                 if (meanElossHe > 0 || stdElossHe / meanElossHe < 0.2 || meanElossHe / meanElossErrHe - 1 > 0.5) {
                     R_He = stdElossHe / meanElossHe;
-                    R_He_err = (1. / meanElossHe) * sqrt(pow(stdElossErrHe, 2) + pow(R_He * meanElossErrHe, 2) - 2 * R_He * cov_mu_sigma_He);
-
+                    R_He_err = (1. / meanElossHe) * sqrt(pow(stdElossErrHe, 2) + pow(R_He * meanElossErrHe, 2));
+                    
+                    if (R_He_err >= 0.00005) R_He_err = 0.0001;
                     auto [R_He_str, R_He_err_str] = RoundMeasurement(R_He, R_He_err);
                     R_He = std::stod(R_He_str);
                     R_He_err = std::stod(R_He_err_str);
@@ -131,23 +134,31 @@ void FitHistograms(
             hist->Draw();
 
             TFitResultPtr fitResult = FitWithTSpectrum(hist, energy);
-            if (fitResult.Get() != nullptr) {
-                double meanTof = fitResult->Parameter(1);
-                double meanTofErr = fitResult->Error(1);
-                double stdTof = fitResult->Parameter(2);
-                double stdTofErr = fitResult->Error(2);
-                double cov_mu_sigma_ToF = fitResult->CovMatrix(1, 2);
+            //FitStats statsTof = FitResampling(hist, energy, fitResult->Parameter(1), fitResult->Parameter(2));
 
+            double meanTof = fitResult->Parameter(1);
+            double meanTofErr = fitResult->Error(1);
+            //double meanTofErr = statsTof.stddevOfMean;
+            double stdTof = fitResult->Parameter(2);
+            double stdTofErr = fitResult->Error(2);
+            //double stdTofErr = statsTof.stddevOfSigmas;
+
+            if (meanTofErr >= 0.00005) meanTofErr = 0.0001;
+            
+            if (fitResult.Get() != nullptr) {
                 auto [meanTof_str, meanTofErr_str] = RoundMeasurement(meanTof, meanTofErr);
-                auto [stdTof_str, stdTofErr_str] = RoundMeasurement(stdTof, stdTofErr);
                 meanTof = std::stod(meanTof_str);
                 meanTofErr = std::stod(meanTofErr_str);
-                stdTof = std::stod(stdTof_str);
-                stdTofErr = std::stod(stdTofErr_str);
 
                 // conversion from ns to ps
                 stdTof *= 1000.;
                 stdTofErr *= 1000.;
+
+                if (stdTofErr >= 0.05) stdTofErr = 0.1;
+                auto [stdTof_str, stdTofErr_str] = RoundMeasurement(stdTof, stdTofErr);
+                stdTof = std::stod(stdTof_str);
+                stdTofErr = std::stod(stdTofErr_str);
+
 
                 R_Tof_vec.push_back(stdTof);
                 R_Tof_err_vec.push_back(stdTofErr);
@@ -156,7 +167,6 @@ void FitHistograms(
                 meanTof_err_vec.push_back(meanTofErr);
 
                 cout << "TOF resolution (ps): " << stdTof << " +/- " << stdTofErr << endl;
-                cout << "cov_mu_sigma_ToF: " << cov_mu_sigma_ToF << endl;
 
                 WriteTofTable(LatexFile_Tof, energy, meanTof, meanTofErr,
                     stdTof, stdTofErr);
@@ -222,14 +232,15 @@ TFitResultPtr FitWithTSpectrum(TH1D *hist, int energy)
     {
         double peakPosition = spectrum.GetPositionX()[0];
         if ((TString(hist->GetName()) == "Eloss") && energy == 220) peakPosition = 5.22;
-        int binFit = (TString(hist->GetName()) == "Tof") ? 5 : 7;
+        int binFit = (TString(hist->GetName()) == "ToF") ? 5 : 7;
+        //if (TString(hist->GetName()) == "ToF" && energy == 100) binFit = 3;
         int binPeak = hist->FindBin(peakPosition);
         int binLow = std::max(1, binPeak - binFit);
         int binHigh = std::min(hist->GetNbinsX(), binPeak + binFit);
         TF1 *gaus = new TF1("gaus", "gaus", hist->GetBinLowEdge(binLow), hist->GetBinLowEdge(binHigh + 1));
         gaus->SetParameter(1, peakPosition);
         gaus->SetParLimits(1, peakPosition - 0.5, peakPosition + 0.5);
-        fitResult = hist->Fit("gaus", "RS");
+        fitResult = hist->Fit("gaus", "QRS");
         if (fitResult->Status() != 0)
         {
             cout << "fit failed" << endl;
@@ -245,57 +256,115 @@ TFitResultPtr FitWithTSpectrum(TH1D *hist, int energy)
     return fitResult;
 }
 
+TFitResultPtr FitInResampling(TH1D *hist, int energy)
+{
+    int nPeaks = 0;
+    TSpectrum spectrum(1);
+    nPeaks = spectrum.Search(hist, 1, "", 0.0015);
+    cout << "# of peaks: " << nPeaks << endl;
+    TFitResultPtr fitResult;
 
-void FitHistogramWithUniformFluctuation(TH1D* hOriginal, int nTrials = 100) {
-    TRandom3 rand(0); // Random number generator
+    if (nPeaks == 0)
+    {
+        std::cerr << "No TOF peaks found" << std::endl;
+        return nullptr;
+    }
+    else
+    {
+        double peakPosition = spectrum.GetPositionX()[0];
+        if ((TString(hist->GetName()) == "Eloss") && energy == 220) peakPosition = 5.22;
+        int binFit = (TString(hist->GetName()) == "Tof") ? 5 : 7;
+        if (TString(hist->GetName()) == "Tof" && energy == 100) binFit = 3;
+        int binPeak = hist->FindBin(peakPosition);
+        int binLow = std::max(1, binPeak - binFit);
+        int binHigh = std::min(hist->GetNbinsX(), binPeak + binFit);
+        TF1 *gaus = new TF1("gaus", "gaus", hist->GetBinLowEdge(binLow), hist->GetBinLowEdge(binHigh + 1));
+        gaus->SetParameter(1, peakPosition);
+        gaus->SetParLimits(1, peakPosition - 0.5, peakPosition + 0.5);
+        fitResult = hist->Fit("gaus", "QRS");
+        if (fitResult->Status() != 0)
+        {
+            cout << "fit failed" << endl;
+            return nullptr;
+        }
+    }
+    return fitResult;
+}
+
+
+
+FitStats FitResampling(TH1D* hOriginal, int energy, double expectedMean, double expectedSigma) {
+    TRandom3 rand(0);
     std::vector<double> meanValues;
+    std::vector<double> sigmaValues;
+    const int nTrials = 1000;
+
+    // Histogram range from expected values
+    double meanMin = expectedMean - expectedSigma/100.;
+    double meanMax = expectedMean + expectedSigma/100.;
+    double sigmaMin = expectedSigma - expectedSigma/100.;
+    double sigmaMax = expectedSigma + expectedSigma/100.;
+
+    // Histograms for the distribution of fit parameters
+    TH1D* hMeanDist = new TH1D("hMeanDist", "Distribution of Fit Means;Mean;Counts", 100, meanMin, meanMax);
+    TH1D* hSigmaDist = new TH1D("hSigmaDist", "Distribution of Fit Sigmas;Sigma;Counts", 100, sigmaMin, sigmaMax);
 
     for (int i = 0; i < nTrials; ++i) {
-        // Clone and reset the histogram
-        TH1* hToy = (TH1D*)hOriginal->Clone(Form("hToy_%d", i));
+        TH1D* hToy = (TH1D*)hOriginal->Clone(Form("hToy_%d", i));
         hToy->Reset();
 
-        // Fill each bin with uniformly fluctuated bin content
         for (int bin = 1; bin <= hOriginal->GetNbinsX(); ++bin) {
             double n = hOriginal->GetBinContent(bin);
-            double delta = rand.Uniform(-std::sqrt(n), std::sqrt(n));
+            double delta = rand.Gaus(0., std::sqrt(n));
             double newContent = n + delta;
-            if (newContent < 0) newContent = 0; // Clamp to avoid negative content
+            if (newContent < 0) newContent = 0;
             hToy->SetBinContent(bin, newContent);
         }
 
-        // Fit the toy histogram
-        TF1* fitFunc = new TF1("fitFunc", "gaus", hToy->GetXaxis()->GetXmin(), hToy->GetXaxis()->GetXmax());
-        if (hToy->Fit(fitFunc, "Q0") == 0) { // Fit successful
-            double mean = fitFunc->GetParameter(1);
+        TFitResultPtr fitResult = FitInResampling(hToy, energy);
+        if (fitResult.Get() != nullptr) {
+            double mean = fitResult->Parameter(1);
+            double sigma = fitResult->Parameter(2);
             meanValues.push_back(mean);
+            sigmaValues.push_back(sigma);
+            hMeanDist->Fill(mean);
+            hSigmaDist->Fill(sigma);
         }
 
         delete hToy;
-        delete fitFunc;
     }
 
-    int nSuccess = meanValues.size();
-    if (nSuccess < 2) {
-        std::cout << "Not enough successful fits to compute statistics." << std::endl;
-        return;
-    }
+    // Fit the distributions with Gaussians
+    TF1* gausSigma = new TF1("gausSigma", "gaus", sigmaMin, sigmaMax);
 
-    // Compute mean of the means
-    double sum = std::accumulate(meanValues.begin(), meanValues.end(), 0.0);
-    double meanOfMeans = sum / nSuccess;
+    int nPeaks = 0;
+    TSpectrum spectrum(1);
+    nPeaks = spectrum.Search(hMeanDist, 1, "", 0.0015);
+    double peakPosition = spectrum.GetPositionX()[0];
+    int binFit = 4;
+    int binPeak = hMeanDist->FindBin(peakPosition);
+    int binLow = std::max(1, binPeak - binFit);
+    int binHigh = std::min(hMeanDist->GetNbinsX(), binPeak + binFit);
 
-    // Compute the unbiased error on the mean
-    double variance = 0.0;
-    for (double m_i : meanValues) {
-        variance += (m_i - meanOfMeans) * (m_i - meanOfMeans);
-    }
-    double stddev = std::sqrt(variance / (nSuccess * (nSuccess - 1)));
+    TF1* gausMean = new TF1("gausMean", "gaus", hMeanDist->GetBinLowEdge(binLow), hMeanDist->GetBinLowEdge(binHigh + 1));
 
-    // Print results
-    std::cout << "Mean of fit means     : " << meanOfMeans << std::endl;
-    std::cout << "Uncertainty on the mean: " << stddev << std::endl;
+    hMeanDist->Fit(gausMean, "QR");
+    hSigmaDist->Fit(gausSigma, "QR");
+
+    hMeanDist->Write();
+    hSigmaDist->Write();
+
+    double meanOfMeans = gausMean->GetParameter(1);
+    double stddevOfMean = gausMean->GetParameter(2);
+    double meanOfSigmas = gausSigma->GetParameter(1);
+    double stddevOfSigmas = gausSigma->GetParameter(2);
+
+    std::cout << "Stddev of Mean   : " << stddevOfMean << std::endl;
+    std::cout << "Stddev of Sigmas  : " << stddevOfSigmas << std::endl;
+
+    return {stddevOfMean, stddevOfSigmas};
 }
+
 
 
 void WriteElossTable(std::ofstream& outFile, int energy, 

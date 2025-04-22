@@ -19,6 +19,7 @@
 #include <TCanvas.h>
 #include <TGraphErrors.h>
 #include <iostream>
+#include <string>     // std::string, std::stod
 #include <map>
 #include <vector>
 #include <cmath>

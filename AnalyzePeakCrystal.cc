@@ -48,10 +48,10 @@ void AnalyzePeakCrystal() {
                         Charge_Calo_crystal->GetXaxis()->SetRangeUser(0.08, 0.18);
                     }
                     else if (energy == 140) {
-                        Charge_Calo_crystal->GetXaxis()->SetRangeUser(0.12, 0.24);
+                        Charge_Calo_crystal->GetXaxis()->SetRangeUser(0.16, 0.24);
                     }
                     else {
-                        Charge_Calo_crystal->GetXaxis()->SetRangeUser(0.2, 0.4);
+                        Charge_Calo_crystal->GetXaxis()->SetRangeUser(0.24, 0.4);
                     }
                 }
                 else {
@@ -76,6 +76,13 @@ void AnalyzePeakCrystal() {
                     double meanCharge = fitResult->Parameter(1);
                     double meanChargeErr = fitResult->ParError(1);
                     double stdCharge = fitResult->Parameter(2);
+                    TPaveText *fitInfo = new TPaveText(0.15, 0.75, 0.35, 0.85, "NDC");
+                    fitInfo->AddText(Form("%d MeV/u", energy));
+                    fitInfo->AddText(Form("mean = %f", meanCharge));
+                    fitInfo->AddText(Form("sigma = %f", stdCharge));
+                    fitInfo->AddText(Form("res (perc.) = %.3f", 100.* stdCharge / meanCharge));
+                    fitInfo->SetTextSize(0.02);
+                    fitInfo->Draw("same");
                     PrintMeasurement(meanCharge, meanChargeErr);
                     if (meanCharge / stdCharge - 1 < 0.1 || stdCharge == 0. || meanCharge / meanChargeErr - 1 < 0.5) {
                         std::cout << "Skipping fit because the mean/std or mean/meanErr charge ratios are close to 1" << std::endl;
@@ -121,10 +128,13 @@ TFitResultPtr FitPeakWithTSpectrum(TH1D *hist, int energy, int crystal_ID) {
 
     double peakPos = spectrum.GetPositionX()[0];
     if (energy == 200 && crystal_ID == 15) peakPos = 0.514;
+    else if (energy == 200 && crystal_ID == 6) peakPos = 0.467;
     std::cout << "Peak found at x = " << peakPos << std::endl;
 
     int binMax = hist->FindBin(peakPos);
     int bins_fit = (energy == 220 && crystal_ID == 9) ? 5 : 3;
+    if ((energy == 140) && crystal_ID == 0) bins_fit = 2;
+    else if (energy == 200 && crystal_ID == 1) bins_fit = 4;
     int binLow = std::max(1, binMax - bins_fit);
     int binHigh = std::min(hist->GetNbinsX(), binMax + bins_fit);
 

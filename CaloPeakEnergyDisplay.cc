@@ -62,7 +62,7 @@ void CaloPeakEnergyDisplay() {
         }
 
         TF1* f1 = new TF1("f1", "[0]*x", 0., graph->GetXaxis()->GetXmax());
-        TFitResultPtr fitresult_linear = graph->Fit(f1, "S");
+        TFitResultPtr fitresult_linear = graph->Fit(f1, "SW");
         if (fitresult_linear.Get() && fitresult_linear->Status() == 0) {
 
             //auto [intercept, sigma_intercept] = RoundMeasurement(fitresult_linear->Parameter(0), fitresult_linear->ParError(0));
@@ -95,6 +95,9 @@ void CaloPeakEnergyDisplay() {
             } else {
                 ratio = slope / reference_slope;
                 ratio_error = ratio * sqrt(pow(sigma_slope / slope, 2) + pow(reference_error / reference_slope, 2));
+                auto [ratio_round, ratio_error_round] = RoundMeasurement(ratio, ratio_error);
+                ratio = ratio_round;
+                ratio_error = ratio_error_round;
                 slopeRatios[crystalID] = {ratio, ratio_error};
             }
 
@@ -104,7 +107,7 @@ void CaloPeakEnergyDisplay() {
             }
             else
             {
-                fitInfo->AddText(Form("Slope crystal ID %d / slope crystal ID 0 = %f#pm%f", crystalID, ratio, ratio_error));
+                fitInfo->AddText(Form("Slope crystal ID %d / slope crystal ID 0 = %.2f#pm%.2f", crystalID, ratio, ratio_error));
             }
             //fitInfo->AddText(Form("Intercept [a.u.] = %f#pm %f", intercept, sigma_intercept));
             //fitInfo->AddText(Form("#chi^{2} / ndf = %.2f / %d", chi2, ndf));

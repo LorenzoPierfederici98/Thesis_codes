@@ -56,7 +56,6 @@ void CompareCalibrated() {
 // New helper function: getHistogramByBar
 // Opens the file, goes to the given directory, and iterates over keys
 // to find a histogram whose name exactly equals 'desiredHistName'.
-// Only histograms whose names start with "noCuts_Eloss" are considered.
 TH1D* getElossByBar(TFile* file, const std::string &dirName, const TString &desiredHistName) {
     // Change to the desired directory.
     TDirectory* dir = dynamic_cast<TDirectory*>(file->Get(dirName.c_str()));
@@ -149,7 +148,7 @@ void ElossNormalizedHistograms(TH1* hDataRaw, TH1* hData, TH1* hMC, const TStrin
     //minY *= 0.5;
 
     hData->GetYaxis()->SetRangeUser(minY, maxY);
-    hData->GetXaxis()->SetTitle("Energy loss [MeV] - Q [a.u.]");
+    hData->GetXaxis()->SetTitle("#Delta E [MeV] - Q [a.u.]");
     hData->GetYaxis()->SetTitle("Entries");
     hData->SetTitleSize(0.1, "T");
     hData->GetXaxis()->SetTitleSize(0.05);
@@ -165,11 +164,11 @@ void ElossNormalizedHistograms(TH1* hDataRaw, TH1* hData, TH1* hMC, const TStrin
     hMC->Draw("HIST SAME");
     
     // Build a legend to distinguish the histograms
-    TLegend *leg = new TLegend(0.65, 0.7, 0.95, 0.85);
-    leg->AddEntry(hData, "SHOE Calib. Eloss", "l");
-    leg->AddEntry(hDataRaw, "Raw Eloss #sqrt{Q_{A}Q_{B}}", "l");
+    TLegend *leg = new TLegend(0.58, 0.65, 0.95, 0.85);
+    leg->AddEntry(hDataRaw, "Uncalibrated Eloss", "l");
+    leg->AddEntry(hData, "Calibrated Eloss", "l");
     leg->AddEntry(hMC, "MC", "l");
-    leg->SetTextSize(0.04);
+    leg->SetTextSize(0.05);
     leg->Draw();
 
     TString plotName = ElossCanvasName;
@@ -225,11 +224,11 @@ void TofNormalizedHistograms(TH1* hTofDataRaw, TH1* hTofData, TH1* hTofMC, const
     hTofMC->Draw("HIST SAME");
     
     // Build a legend to distinguish the histograms
-    TLegend *leg = new TLegend(0.65, 0.7, 0.95, 0.85);
-    leg->AddEntry(hTofData, "SHOE Calib. TOF", "l");
-    leg->AddEntry(hTofDataRaw, "Raw TOF T_{bar} - T_{SC}", "l");
+    TLegend *leg = new TLegend(0.6, 0.65, 0.95, 0.82);
+    leg->AddEntry(hTofData, "Calibrated TOF", "l");
     leg->AddEntry(hTofMC, "MC", "l");
-    leg->SetTextSize(0.04);
+    leg->AddEntry(hTofDataRaw, "Uncalibrated TOF", "l");
+    leg->SetTextSize(0.05);
     leg->Draw();
 
     TString plotName = TofCanvasName;
@@ -292,7 +291,7 @@ void ProcessFile(const std::string &dataFileRaw, const std::string &dataFile, co
     TH1D *hTofMC = getTofByBar(mcFilePtr, tofDirMC.Data(), histNameTof.Data());
     
     // Create a title and canvas name that include layer, bar, and energy.
-    TString ElossTitle = TString::Format("Raw, calibrated and MC Eloss layer %s bar %d @ %d MeV/u", layer.c_str(), bar, energy);
+    TString ElossTitle = TString::Format("Raw, calibrated and MC#Delta E layer %s bar %d @ %d MeV/u", layer.c_str(), bar, energy);
     TString ElossCanvasName = TString::Format("c_Eloss_Layer%s_bar%d_%dMeV", layer.c_str(), bar, energy);
     TString TofTitle = TString::Format("Raw, calibrated and MC TOF layer %s bar %d @ %d MeV/u", layer.c_str(), bar, energy);
     TString TofCanvasName = TString::Format("c_Tof_Layer%s_bar%d_%dMeV", layer.c_str(), bar, energy);

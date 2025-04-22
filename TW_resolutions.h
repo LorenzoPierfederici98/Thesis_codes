@@ -17,6 +17,11 @@
  #include <map>
  #include <regex>
  #endif
+
+ struct FitStats {
+    double stddevOfMean;
+    double stddevOfSigmas;
+};
  
  void FitHistograms(
      TFile* inFile,
@@ -49,6 +54,10 @@
  );
 
  TFitResultPtr FitWithTSpectrum(TH1D *hist, int energy);
+
+ TFitResultPtr FitInResampling(TH1D *hist, int energy);
+
+ FitStats FitResampling(TH1D* hOriginal, int energy, double expectedMean, double expectedSigma);
 
  void WriteElossTable(std::ofstream& outFile, int energy, 
     double meanElossHe, double stdElossHe, double R_He,

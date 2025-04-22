@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <TCanvas.h>
 #include <fstream>
 #include <iostream>
 #include <iomanip>
@@ -21,7 +20,10 @@
 #include <TH1.h>
 #include <TROOT.h>
 #include <TKey.h>
+#include <TCanvas.h>
 #include <TLatex.h>
+#include <TDirectory.h>
+#include <TLinearFitter.h>
 
 #include "TAGcampaignManager.hxx"
 #include "TAGactTreeReader.hxx"
@@ -161,9 +163,7 @@ Bool_t readBinTwCalibFile = false;
 
 enum{kCharges=8,kLayers=2,kBars=20};  //TW
 enum{kModules=7, kCrysPerModule=9};  //Calorimeter
-enum{kCalibCrystals=19};
 // enum{kCharges=8,kLayers=2,kCentralBars=3};
-enum{max_cluster_number=10};
 enum{kVTreg=2,kTWreg=4};
 enum FlukaVar {kPrimaryID=0,kNeutronFlukaId=8};
 enum TrigID {kTrigsN=4,kMBplusVeto=0,kVeto=1,kMB=40,kSTtrig=42};
@@ -190,36 +190,35 @@ typedef std::vector<std::pair<Int_t,Int_t> > TVecPair;
 // TH1F*           fpHisSeedMap[MaxPlane];    ///< seed map
 // TH1F*           fpHisStripMap[MaxPlane];   ///< strip map
 
-TH1D *Charge_Calo_total;  //charge in all calo
-// Non calibrated and calibrated charge hist. form cluster size 2 and a single cluster
-TH1D *Charge_Calo_nonCalibrated; 
-TH1D *Charge_Calo_Calibrated;
-//TH1D *Charge_Calo_Module[kModules];  //charge per module in calo
-TH1D *Charge_Calo_crystal[kModules * kCrysPerModule];  //charge per crystal id in calo
-TH1D *Charge_Calo_crystal_noCuts[kModules * kCrysPerModule];
-TH1D *ClusterCharge_Calo_crystal[kModules * kCrysPerModule];
-// charge histograms for cluster size 1, for the 19 calibrated crystals
-TH1D *ClusterCharge_Calo_Calibrated[kModules * kCrysPerModule];
-std::map<Int_t, TH1D*> minCharge;  // Min charge for every cluster size
+TH1D *Bar_ID_X;  //bar ID for a given layer
+TH1D *Bar_ID_Y;
+TH1D *hHits_X;
+TH1D *h_nValidHits_X;
+TH1D *h_nValidHits_Y;
+TH1D *hHits_Y;
+TH1D *Z_clusterSize1;
+TH1D *Z_clusterSize2;
+TH2D *dE_vs_tof_clusterSize1;
+TH2D *dE_vs_tof_clusterSize2;
 
-TH1D *Clusters_size;
-TH1D *Clusters_size_noCuts;
-TH1D *Clusters_number;
-TH2D *hClusterSize_Charge[kModules * kCrysPerModule];
-TH2D *Correlated_ClusterCharge[kCrysPerModule][kCrysPerModule];
-TH2D *MinCharge_ClusterSize;
-//TH2D *hCalClusterPos[max_cluster_number];
+TH1D *CS1_Calo_Calibrated_Z1[kModules * kCrysPerModule];
+TH1D *CS1_Calo_Calibrated_Z2[kModules * kCrysPerModule];
+TH1D *CS2_Calo_Calibrated_Z1;
+TH1D *CS2_Calo_Calibrated_Z2;
 
-TH2D *hCalMapPos[kModules];  //2D histogram of x, y positions in the calorimeter
-TH2D *hCalMapCrystalID[kModules];  //2D histogram of crystalID in modules
 
 void  InitializeContainers();
-void  BookHistograms();
+void  BookHistograms(TDirectory* DirChargeTimeLayerX, TDirectory* DirChargeTimeLayerY, 
+                    TDirectory* DirToFLayerX, TDirectory* DirToFLayerY);
 void  GetFOOTgeo(TAGcampaignManager* camp_manager, Int_t run_number);
-void  GetRunAndGeoInfo( TAGcampaignManager* campManager, Int_t runNumber);
+void  GetRunAndGeoInfo(TAGcampaignManager* campManager, Int_t runNumber);
 void  SetTreeBranchAddress(TAGactTreeReader *treeReader);
 void  ProjectTracksOnTw(int Z, TVector3 init_pos, TVector3 init_p);
+void  LoopOverMCtracks(Int_t Emin, Int_t Emax, Bool_t isnotrig);
+void  AdjustHistoRange(TH1D *Histo);
 void SetTitleAndLabels(TObject* obj, const char* title, const char* xLabel, const char* yLabel);
+std::map<Int_t, std::map<Int_t, Double_t>> extractBarData();
+std::map<Int_t, std::map<Int_t, Double_t>> extractTofData(Int_t energy);
 std::map<Int_t, Double_t> extractCrystalData();
 
 Bool_t IsVTregion(int reg);
@@ -230,4 +229,4 @@ inline Int_t GetZbeam() {return parGeo->GetBeamPar().AtomicNumber;}
 // TW center in global ref frame
 inline TVector3 GetTwCenter() {return geoTrafo->GetTWCenter();}   
 // TW theta angle geometrical acceptance
-inline Double_t GetMaxAngle() {return TMath::ATan(((nBarsPerLayer*twparGeo->GetBarWidth())/2-TMath::Abs(GetTwCenter().y())-maxTGy)/GetTwCenter().z()); } // rad
+inline Double_t GetMaxAngle() {return TMath::ATan(((nBarsPerLayer*twparGeo->GetBarWidth())/2-TMath::Abs(GetTwCenter().y())-maxTGy)/GetTwCenter().z()); } // rad   

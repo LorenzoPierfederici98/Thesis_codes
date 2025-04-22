@@ -4,10 +4,10 @@
 // and run with (for example): root -l -b -q AnalyzeFOOT.cc++g\(\"../../../../rootfiles/outMC_16O_C_400_1_GSI.root\",1,10,\"\"\)
 // sul tier1:  root -l -b -q AnalyzeFOOT.cc++g\(\"/storage/gpfs_data/foot/mtoppi/DataDecoded/CNAO2023/test.root\",0,1000,\"testAnaFOOT\",\"/storage/gpfs_data/foot/mtoppi/OutputMacro/\"\)
 
-#include "CalibratedTW.h"
+#include "CalibratedTWCalo.h"
 
 // main
-void CalibratedTW(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t nev = 10, TString outfile = "AnaFOOT.root", TString outDir = "/Users/marco/FOOT/Analisi/shoe/build/Reconstruction/OutputMacro")
+void CalibratedTWCalo(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t nev = 10, TString outfile = "AnaFOOT.root", TString outDir = "/Users/marco/FOOT/Analisi/shoe/build/Reconstruction/OutputMacro")
 
 {
 
@@ -184,19 +184,12 @@ void CalibratedTW(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t n
   Int_t pointIndex_bar9_layerX_filtered = 0;
   Int_t pointIndex_bar9_layerY_filtered = 0;
 
-  Double_t d_SC_TW = 1.439;  // distance between SC and TW, in m
-  //Double_t d_SC_TW = 0.95183;
+  Double_t d_SC_TW = 1.;  // distance between SC and TW, in m
   Double_t bar_density = 1.023;  // density of the bars in g/cm^3
   Double_t bar_thickness = 0.3;  // thickness of the bars in cm
 
   Int_t energy = std::stoi(beamEnergyStr);
   Int_t ev = -1;
-
-  // Extracting the calibration coefficients of every bar to build
-  // my calibrated eloss histograms
-  std::map<Int_t, std::map<Int_t, Double_t>> calibCoeff = extractBarData();
-
-  std::map<Int_t, std::map<Int_t, Double_t>> tofCoeff = extractTofData(energy);
 
   // Loop over the TTree to build the ampl-charge scatterplot
   // to be fitted with a linear function, to discard the pileup hits
@@ -292,6 +285,8 @@ void CalibratedTW(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t n
   ev = -1;
   fActReader->Open(infile);
   gTAGroot.AddRequiredItem(fActReader);
+
+  std::map<Int_t, Double_t> calibCoeff = extractCrystalData();
 
   gTAGroot.BeginEventLoop();
 
@@ -422,13 +417,7 @@ void CalibratedTW(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t n
       Double_t QBarX = sqrt(QAX * QBX);
       Double_t tofX = hitX->GetToF();
       Double_t elossX = hitX->GetEnergyLoss();
-      Double_t nonCalib_tofX = hitX->GetTime();
-      Double_t myelossX = QBarX * calibCoeff.at((Int_t)LayerX).at(barX);
-      Double_t mytofX = nonCalib_tofX - tofCoeff.at((Int_t)LayerX).at(barX);
-      Double_t betaX = d_SC_TW / ((3. / 10.) * tofX);  // 3/10 being c in m/ns, as tof is in ns
-      Double_t mass_stopping_powerX = myelossX / (bar_density * bar_thickness);
       Double_t ZX = hitX->GetChargeZ();
-      Double_t ZX_reco = CalculateZ(elossX, betaX);
 
       TATWhit *hitY = twNtuHit->GetHit(hitNumber_Y, (Int_t)LayerY);
       Int_t barY = hitY->GetBar();
@@ -438,115 +427,98 @@ void CalibratedTW(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t n
       Double_t QBarY = sqrt(QAY * QBY);
       Double_t tofY = hitY->GetToF();
       Double_t elossY = hitY->GetEnergyLoss();
-      Double_t nonCalib_tofY = hitY->GetTime();
-      Double_t myelossY = QBarY * calibCoeff.at((Int_t)LayerY).at(barY);
-      Double_t mytofY = nonCalib_tofY - tofCoeff.at((Int_t)LayerY).at(barY);
-      Double_t betaY = d_SC_TW / ((3. / 10.) * tofY);
-      Double_t mass_stopping_powerY = myelossY / (bar_density * bar_thickness);
       Double_t ZY = hitY->GetChargeZ();
-      Double_t ZY_reco = CalculateZ(elossY, betaY);
 
       Bar_ID_X->Fill(barX);
       Bar_ID_Y->Fill(barY);
 
-      if (ZX_reco != -1 && ZY_reco != -1)
-      {
-        Z_reco->Fill(ZX_reco);
-        Z_reco->Fill(ZY_reco);
-      }
-
-      //beta_vs_dE->Fill(betaX, mass_stopping_powerX);
-      //beta_vs_dE->Fill(betaY, mass_stopping_powerY);
-
-      Double_t eloss_thresh = 0.2;
+      Int_t nClusters = caNtuClus->GetClustersN(); // number of clusters
 
       if (ZX == ZY)
       {
-        if (fabs(elossX - elossY) / (elossX + elossY) < eloss_thresh)
+        // selecting a single cluster
+        if (nClusters == 1)
         {
-          dE_vs_tof->Fill(tofX, elossX);
-          dE_vs_tof->Fill(tofY, elossY);
-          if (ZX == 1.)
+          TACAcluster *cluster = caNtuClus->GetCluster(0);
+          if (cluster && cluster->IsValid())
           {
-              dE_vs_tof_Z1->Fill(tofX, elossX);
-              dE_vs_tof_Z1->Fill(tofY, elossY);
-          }
-          else if (ZX == 2.)
-          {
-              dE_vs_tof_Z2->Fill(tofX, elossX);
-              dE_vs_tof_Z2->Fill(tofY, elossY);
+              Int_t nClusterHits = cluster->GetHitsN(); // i.e. cluster size
+              if (nClusterHits == 1)
+              {
+                Z_clusterSize1->Fill(ZX);
+                Z_clusterSize1->Fill(ZY);
+
+                dE_vs_tof_clusterSize1->Fill(tofX, elossX);
+                dE_vs_tof_clusterSize1->Fill(tofY, elossY);
+
+                TACAhit *hit = cluster->GetHit(0);
+                Int_t crystal_id = hit->GetCrystalId();
+                Double_t charge_clusterHit = hit->GetCharge();
+                if (hit->IsValid() && charge_clusterHit > 0.02 && (crystal_id == 0 || calibCoeff.find(crystal_id) != calibCoeff.end()))
+                {
+                  Double_t charge_filling = (crystal_id == 0) ? charge_clusterHit : charge_clusterHit / calibCoeff.at(crystal_id);
+                  if (ZX == 1)
+                  {
+                    CS1_Calo_Calibrated_Z1[crystal_id]->Fill(charge_filling);
+                  }
+                  else if (ZX == 2)
+                  {
+                    CS1_Calo_Calibrated_Z2[crystal_id]->Fill(charge_filling);
+                  }
+                  
+                }
+
+              }
+              else if (nClusterHits == 2)
+              {
+                Z_clusterSize2->Fill(ZX);
+                Z_clusterSize2->Fill(ZY);
+                dE_vs_tof_clusterSize2->Fill(tofX, elossX);
+                dE_vs_tof_clusterSize2->Fill(tofY, elossY);
+
+                Double_t charge_sum_calibrated = 0;
+                bool isZero = false;
+                Double_t stored_charge = 0;
+                for (int iclusterhit = 0; iclusterhit < nClusterHits; iclusterhit++)
+                {
+                  TACAhit *hit = cluster->GetHit(iclusterhit);
+                  if (hit->IsValid())
+                  {
+                    Int_t crystal_id = hit->GetCrystalId();
+                    Double_t charge_clusterHit = hit->GetCharge();
+                    
+                    if (crystal_id == 0 && charge_clusterHit > 0.02)
+                    {
+                        isZero = true;
+                        charge_sum_calibrated += charge_clusterHit;
+                    }
+                    // The find() method returns an iterator to the matching element if found, or end() if not found.
+                    else if ((calibCoeff.find(crystal_id) != calibCoeff.end()) && charge_clusterHit > 0.02)
+                    {
+                    
+                        charge_clusterHit = charge_clusterHit / calibCoeff.at(crystal_id);
+                        stored_charge += charge_clusterHit;
+                    }
+                  }
+
+                }
+                if (isZero)
+                {
+                    charge_sum_calibrated += stored_charge;
+                    if (ZX == 1)
+                    {
+                      CS2_Calo_Calibrated_Z1->Fill(charge_sum_calibrated);
+                    }
+                    else if (ZX == 2)
+                    {
+                      CS2_Calo_Calibrated_Z2->Fill(charge_sum_calibrated);
+                    }
+                }
+              }
           }
         }
       }
 
-      PosX->Fill(posAlongX);
-      PosY->Fill(posAlongY);
-      hTwMapPos->Fill(posAlongX, posAlongY);
-
-      Charge_perBar[(Int_t)LayerX][barX]->Fill(QBarX);
-      Charge_perBar[(Int_t)LayerY][barY]->Fill(QBarY);
-      Eloss_perBar[(Int_t)LayerX][barX]->Fill(elossX);
-      Eloss_perBar[(Int_t)LayerY][barY]->Fill(elossY);
-      My_eloss[(Int_t)LayerX][barX]->Fill(myelossX);
-      My_eloss[(Int_t)LayerY][barY]->Fill(myelossY);
-      hToF[(Int_t)LayerX][barX]->Fill(tofX);
-      hToF[(Int_t)LayerY][barY]->Fill(tofY);
-      MyhToF[(Int_t)LayerX][barX]->Fill(mytofX);
-      MyhToF[(Int_t)LayerY][barY]->Fill(mytofY);
-    }
-
-    Int_t nHits = twNtuHit->GetHitN();
-    if (debug)
-      cout << " TWhits::" << nHits << endl;
-
-    for (int ihit = 0; ihit < nHits; ihit++)
-    {
-
-      TATWhit *hit = twNtuHit->GetHit(ihit);
-
-      if (!hit->IsValid())
-        continue;
-
-      Int_t bar = hit->GetBar();
-      Int_t layer = hit->GetLayer();
-      // Int_t NmcTrk = hit->GetMcTracksN();
-      Double_t eloss = hit->GetEnergyLoss();
-      Double_t tof = hit->GetToF();
-      // Int_t Z = hit->GetChargeZ();
-      Double_t chargeA = hit->GetChargeChA();
-      Double_t chargeB = hit->GetChargeChB();
-      Double_t chargeBar = sqrt(chargeA * chargeB);
-      Double_t timeA = hit->GetTimeChA();
-      Double_t timeB = hit->GetTimeChB();
-      Double_t timeBar = 0.5 * (timeA + timeB);
-      Double_t amplA = hit->GetAmplitudeChA();
-      Double_t amplB = hit->GetAmplitudeChB();
-      Double_t ampl = sqrt(amplA * amplB);
-      Double_t beta = d_SC_TW / ((3. / 10.) * tof);  // 3/10 being c in m/ns, as tof is in ns
-
-      Double_t mass_stopping_power = eloss / (bar_density * bar_thickness);
-      Double_t myeloss = chargeBar * calibCoeff.at(layer).at(bar);
-
-      // if (debug)
-      //  printf("twhit::%d  %s  bar::%d  Z::%d  eloss::%f  NmcTrk::%d\n", ihit, LayerName[(TLayer)layer].data(), bar, Z, eloss, NmcTrk);
-
-      if (!calibTw)
-      {
-        //dE_vs_tof[layer]->Fill(tof, eloss);
-        Charge_perBar_noCuts[layer][bar]->Fill(chargeBar);
-        Eloss_perBar_noCuts[layer][bar]->Fill(eloss);
-        hToF_noCuts[layer][bar]->Fill(tof);
-        //beta_vs_dE->Fill(beta, mass_stopping_power);
-        My_eloss_noCuts[layer][bar]->Fill(myeloss);
-        //betaEloss->SetPoint(pointIndex++, beta, mass_stopping_power);
-
-        if (ev % 10000 == 0) {
-          cout << "Charge layer " << layer << " bar " << bar << " calib.coefficient (1/p0): " << calibCoeff.at(layer).at(bar) << endl;
-          cout << "charge: " << chargeBar << " eloss: " << eloss << " myeloss (q*1/p0): " << myeloss << endl; 
-        }
-      }
-
-    
     }
   }
 
@@ -555,20 +527,6 @@ void CalibratedTW(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t n
   //SetTitleAndLabels(betaEloss, Form("#beta vs mass stopping power @ %d MeV/u beam energy", energy), "#beta", "#frac{dE}{#rho dx} [MeV cm^{2} g^{-1}]");
   //betaEloss->Write("ScatterPlot_beta_vs_dE");
   //SetTitleAndLabels(beta_vs_dE, Form("#beta vs mass stopping power @ %d MeV/u beam energy", energy), "#beta", "#frac{dE}{#rho dx} [MeV cm^{2} g^{-1}]");
-
-  SetTitleAndLabels(dE_vs_tof, Form("dE vs TOF @ %d MeV/u beam energy", energy), "TOF [ns]", "dE [MeV]");
-  SetTitleAndLabels(dE_vs_tof_Z1, Form("dE vs TOF @ %d MeV/u beam energy, Z=1", energy), "TOF [ns]", "dE [MeV]");
-  SetTitleAndLabels(dE_vs_tof_Z2, Form("dE vs TOF @ %d MeV/u beam energy, Z=2", energy), "TOF [ns]", "dE [MeV]");
-
-  SetTitleAndLabels(scatterPlot_bar9_layerX, Form("Scatter plot charge vs signal ampl. layer X bar 9 @ %d MeV/u", energy), "Ampl [a.u.]", "Charge [a.u.]");
-  SetTitleAndLabels(scatterPlot_bar9_layerY, Form("Scatter plot charge vs signal ampl. layer Y bar 9 @ %d MeV/u", energy), "Ampl [a.u.]", "Charge [a.u.]");
-  SetTitleAndLabels(scatterPlot_bar9_layerX_filtered, Form("Filtered scatter plot charge vs signal ampl. layer X bar 9 @ %d MeV/u", energy), "Ampl [a.u.]", "Charge [a.u.]");
-  SetTitleAndLabels(scatterPlot_bar9_layerY_filtered, Form("Filtered scatter plot charge vs signal ampl. layer Y bar 9 @ %d MeV/u", energy), "Ampl [a.u.]", "Charge [a.u.]");
-
-  scatterPlot_bar9_layerX->Write("ScatterPlot_charge_vs_ampl_layerX_bar9");
-  scatterPlot_bar9_layerY->Write("ScatterPlot_charge_vs_ampl_layerY_bar9");
-  scatterPlot_bar9_layerX_filtered->Write("filtered_ScatterPlot_charge_vs_ampl_layerX_bar9");
-  scatterPlot_bar9_layerY_filtered->Write("filtered_ScatterPlot_charge_vs_ampl_layerY_bar9");
 
   cout << endl
        << "Job Done!" << endl;
@@ -581,36 +539,6 @@ void CalibratedTW(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t n
 }
 
 //-----------------------------------------------------------------------------
-Double_t CalculateZ(Double_t dE, Double_t beta)
-{
-
-  //   cout << "CalculateZ dE=" << dE << endl; 
-
-  if(dE <= 0.)
-  {
-    cout << "Z_bethe error" << endl;
-    return -1.;
-  }
-
- else
- {
-    Double_t beta2 = pow(beta, 2);
-
-    Double_t gamma2 = 1./(1. - beta2);
-    // cm, g/cm^3, no units, eV
-    Double_t dx = 0.3, rho = 1.023, Z_A_eff_ratio = 0.5417, I = 64.7E-6;
-    // MeV*cm^2/mol
-    Double_t K = 0.307;
-
-    Double_t Z=TMath::Sqrt(dE*beta2/(dx*K*rho*Z_A_eff_ratio*(TMath::Log(2*0.511*beta2*gamma2/I) - beta2)));
-
-    //dx = 0.3 cm, K = 0.307 MeV*cm^2/mol, rho = 1.023 g/cm^3, Zs/As = 0.5417, I = 64.7 eV
-
-    return Z;
-  }
-
-}
-
 std::map<Int_t, std::map<Int_t, Double_t>> extractBarData() {
     std::map<Int_t, std::map<Int_t, Double_t>> barData;
     std::string filename = "calib/HIT2022/TATW_Energy_Calibration_perBar_4742.cal"; // File is hardcoded
@@ -673,6 +601,33 @@ std::map<Int_t, std::map<Int_t, Double_t>> extractTofData(Int_t energy) {
 
   file.close();
   return tofData;
+}
+
+std::map<Int_t, Double_t> extractCrystalData() {
+  std::map<Int_t, Double_t> crystalData;
+  std::string filename = "calib/HIT2022/SlopeRatios.cal"; // File is hardcoded
+  std::ifstream file(filename);
+
+  if (!file.is_open()) {
+      std::cerr << "Error opening file: " << filename << std::endl;
+      return crystalData;
+  }
+
+  std::string line;
+  while (std::getline(file, line)) {
+      if (line.empty() || line[0] == '#') continue; // Skip headers
+
+      std::istringstream iss(line);
+      Int_t crystalId;
+      Double_t p0, p0_err;
+
+      if (!(iss >> crystalId >> p0 >> p0_err)) continue; // Skip invalid lines
+
+      crystalData[crystalId]= p0;
+  }
+
+  file.close();
+  return crystalData;
 }
 
 void AdjustHistoRange(TH1D *Histo)
@@ -742,8 +697,8 @@ void BookHistograms(TDirectory *DirChargeElossLayerX, TDirectory *DirChargeEloss
   // fpHisStripMap = new TH1F(Form("msStripMap%d", 4+1), Form("MSD - strip map for sensor %d", i+1), pGeoMap->GetStripsN(), 0, msdparGeo->GetStripsN());
   // AddHistogram(fpHisStripMap);
 
-  PosX = new TH1D("Hit_Pos_LayerX", "Hit_Pos_LayerX", 220, -22., 22.); // 2 mm/bin
-  PosY = new TH1D("Hit_Pos_LayerY", "Hit_Pos_LayerY", 220, -22., 22.);
+  std::map<Int_t, Double_t> calibCoeff = extractCrystalData();
+
   Bar_ID_X = new TH1D("BarID_LayerX", "BarID LayerX (1 valid hit on both layers)", 200, 0, 19);
   Bar_ID_Y = new TH1D("BarID_LayerY", "BarID LayerY (1 valid hit on both layers)", 200, 0, 19);
 
@@ -752,58 +707,23 @@ void BookHistograms(TDirectory *DirChargeElossLayerX, TDirectory *DirChargeEloss
   h_nValidHits_X = new TH1D("nValidHits_LayerX", "Number of Valid Hits LayerX", 100, 0, 10);
   h_nValidHits_Y = new TH1D("nValidHits_LayerY", "Number of Valid Hits LayerY", 100, 0, 10);
 
-  //beta_vs_dE = new TH2D(Form("beta_vs_dE"), Form("#beta vs mass stopping power"), 600, 0., 0.6, 600, -10., 50.);
+  Z_clusterSize1 = new TH1D("Z_clusterSize1", "Z cluster size 1", 50, 0., 5.);
+  Z_clusterSize2 = new TH1D("Z_clusterSize2", "Z cluster size 2", 50, 0., 5.);
 
-  dE_vs_tof = new TH2D("dE_vs_tof", "dE vs TOF", 1500, 5., 20., 2500, -5., 20.); // 0.1~ns/bin - 0.1 MeV/bin
-  dE_vs_tof_Z1 = new TH2D("dE_vs_tof_Z1", "dE vs TOF Z1", 1500, 5., 20., 2500, -5., 20.);
-  dE_vs_tof_Z2 = new TH2D("dE_vs_tof_Z2", "dE vs TOF Z2", 1500, 5., 20., 2500, -5., 20.);
+  dE_vs_tof_clusterSize1 = new TH2D("dE_vs_tof_clusterSize1", "dE vs TOF Cluster Size 1", 1500, 5., 20., 2500, -5., 20.); // 0.01~ns/bin - 0.01 MeV/bin
+  dE_vs_tof_clusterSize2 = new TH2D("dE_vs_tof_clusterSize2", "dE vs TOF Cluster Size 2", 1500, 5., 20., 2500, -5., 20.); // 0.01~ns/bin - 0.01 MeV/bin
 
-  Z_reco = new TH1D("Z_reco", "Reconstructed Z", 500, 0., 5.);
+  CS2_Calo_Calibrated_Z1 = new TH1D(Form("CS2_Calo_Calibrated_Z1"), Form("Calibrated Calo Charge - Cluster Size 2 - Z1"), 200, -0.5, 1.5);
+  CS2_Calo_Calibrated_Z2 = new TH1D(Form("CS2_Calo_Calibrated_Z2"), Form("Calibrated Calo Charge - Cluster Size 2 - Z2"), 200, -0.5, 1.5);
 
-  for (int ilay = 0; ilay < kLayers; ilay++)
+  for (int icrystal = 0; icrystal < kModules * kCrysPerModule; icrystal++)
   {
-
-    //dE_vs_tof[ilay] = new TH2D(Form("dE_vs_tof_%s", LayerName[(TLayer)ilay].data()), Form("dE_vs_tof_%s", LayerName[(TLayer)ilay].data()), 25000, 5., 30., 1300, -10., 120.); // 1~ps/bin - 0.1 MeV/bin
-
-    for (int ibar = 0; ibar < (int)nBarsPerLayer; ibar++)
+    if (icrystal == 0 || calibCoeff.find(icrystal) != calibCoeff.end())
     {
-      Charge_perBar[ilay][ibar] = new TH1D(Form("Charge_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Charge %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 120, -2., 20.);
-      Charge_perBar_noCuts[ilay][ibar] = new TH1D(Form("noCuts_Charge_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("No Cuts Charge %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 120, -2., 20.);
-      Eloss_perBar_noCuts[ilay][ibar] = new TH1D(Form("noCuts_Eloss_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("No Cuts SHOE Calibrated Energy Loss %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 200, 0., 20.);
-      Eloss_perBar[ilay][ibar] = new TH1D(Form("Eloss_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("SHOE Calibrated Energy Loss %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 200, 0., 20.);
-      hToF[ilay][ibar] = new TH1D(Form("ToF_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("ToF %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 220, 6., 20.);
-      MyhToF[ilay][ibar] = new TH1D(Form("MyToF_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Pisa Calibrated ToF %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 220, 6., 20.);
-      hToF_noCuts[ilay][ibar] = new TH1D(Form("noCuts_ToF_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("No Cuts TOF %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 220, 6., 20.);
-      My_eloss_noCuts[ilay][ibar] = new TH1D(Form("noCuts_MyEloss_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("No Cuts Pisa Calibrated Energy Loss %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 200, 0., 20.);
-      My_eloss[ilay][ibar] = new TH1D(Form("MyEloss_%s_bar%d", LayerName[(TLayer)ilay].data(), ibar), Form("Pisa Calibrated Energy Loss %s bar%d", LayerName[(TLayer)ilay].data(), ibar), 200, 0., 20.);
-      if (ilay == (Int_t)LayerX)
-      {
-        Charge_perBar[ilay][ibar]->SetDirectory(DirChargeElossLayerX);
-        Charge_perBar_noCuts[ilay][ibar]->SetDirectory(DirChargeElossLayerX);
-        Eloss_perBar_noCuts[ilay][ibar]->SetDirectory(DirChargeElossLayerX);
-        Eloss_perBar[ilay][ibar]->SetDirectory(DirChargeElossLayerX);
-        hToF[ilay][ibar]->SetDirectory(DirToFLayerX);
-        MyhToF[ilay][ibar]->SetDirectory(DirToFLayerX);
-        hToF_noCuts[ilay][ibar]->SetDirectory(DirToFLayerX);
-        My_eloss[ilay][ibar]->SetDirectory(DirChargeElossLayerX);
-        My_eloss_noCuts[ilay][ibar]->SetDirectory(DirChargeElossLayerX);
-      }
-      else
-      {
-        Charge_perBar[ilay][ibar]->SetDirectory(DirChargeElossLayerY);
-        Charge_perBar_noCuts[ilay][ibar]->SetDirectory(DirChargeElossLayerY);
-        Eloss_perBar_noCuts[ilay][ibar]->SetDirectory(DirChargeElossLayerY);
-        Eloss_perBar[ilay][ibar]->SetDirectory(DirChargeElossLayerY);
-        hToF[ilay][ibar]->SetDirectory(DirToFLayerY);
-        MyhToF[ilay][ibar]->SetDirectory(DirToFLayerY);
-        hToF_noCuts[ilay][ibar]->SetDirectory(DirToFLayerY);
-        My_eloss[ilay][ibar]->SetDirectory(DirChargeElossLayerY);
-        My_eloss_noCuts[ilay][ibar]->SetDirectory(DirChargeElossLayerY);
-      }
+      CS1_Calo_Calibrated_Z1[icrystal] = new TH1D(Form("CS1_Calo_Calibrated_Z1_%d", icrystal), Form("Calibrated Calo Charge - Cluster Size 1 - Z1 - Crystal ID %d", icrystal), 200, -0.5, 1.5);
+      CS1_Calo_Calibrated_Z2[icrystal] = new TH1D(Form("CS1_Calo_Calibrated_Z2_%d", icrystal), Form("Calibrated Calo Charge - Cluster Size 1 - Z2 - Crystal ID %d", icrystal), 200, -0.5, 1.5);
     }
   }
-
-  hTwMapPos = new TH2D("hTwMapPos", "hTwMapPos", 220, -22., 22., 220, -22., 22.); // 2 mm/bin - 2 mm/bin
 
   return;
 }

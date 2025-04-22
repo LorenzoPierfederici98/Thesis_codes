@@ -4,10 +4,10 @@
 // and run with (for example): root -l -b -q AnalyzeFOOT.cc++g\(\"../../../../rootfiles/outMC_16O_C_400_1_GSI.root\",1,10,\"\"\)
 // sul tier1:  root -l -b -q AnalyzeFOOT.cc++g\(\"/storage/gpfs_data/foot/mtoppi/DataDecoded/CNAO2023/test.root\",0,1000,\"testAnaFOOT\",\"/storage/gpfs_data/foot/mtoppi/OutputMacro/\"\)
 
-#include "AnalyzeCaloClusters.h"
+#include "AnalyzeCaloClustersInterCalib.h"
 
 // main
-void AnalyzeCaloClusters(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t nev = 10, TString outfile = "AnaFOOT.root", TString outDir = "/Users/marco/FOOT/Analisi/shoe/build/Reconstruction/OutputMacro")
+void AnalyzeCaloClustersInterCalib(TString infile = "testMC.root", Bool_t isMax = kFALSE, Int_t nev = 10, TString outfile = "AnaFOOT.root", TString outDir = "/Users/marco/FOOT/Analisi/shoe/build/Reconstruction/OutputMacro")
 
 {
 
@@ -170,11 +170,40 @@ void AnalyzeCaloClusters(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
 
     Int_t ev = -1;
     Int_t energy = std::stoi(beamEnergyStr);
-    std::map<std::pair<int, int>, TGraph *> scatterPlots;
 
     std::map<Int_t, Double_t> calibCoeff = extractCrystalData();
+    std::map<std::pair<Int_t, Int_t>, TGraph *> scatterPlots;
+
+    // Intercalibration coefficients to align the charge
+    // values of crystal 1 and 6 with the one of crystal 0.
+    // Valid only for 180 and 200 MeV/u beam energy values.
+    // Obtained by fitting the upper diagonal of the crystal ID
+    // 1 vs 0 and 6 vs 0 scatter plots.
+    Double_t m_0_1, q_0_1;
+    Double_t m_0_6, q_0_6;
+
+    // intercalib refers to the ratio of the slopes of crystal IDs
+    // 1 and 0 with respect to 0
+    Double_t m_0_1_intercalib = -1.69269;
+    Double_t m_0_6_intercalib = -1.63262;
+
+    if (energy == 180)
+    {
+        m_0_1 = -1.382;
+        q_0_1 = 0.3811;
+        m_0_6 = -1.404;
+        q_0_6 = 0.3786;
+    }
+    else
+    {
+        m_0_1 = -1.297;
+        q_0_1 = 0.4074;
+        m_0_6 = -1.481;
+        q_0_6 = 0.4464;
+    }
 
     // Loop over the TTree
+
     gTAGroot.BeginEventLoop();
     while (gTAGroot.NextEvent() && ev != nentries)
     {
@@ -219,12 +248,6 @@ void AnalyzeCaloClusters(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
                 //Charge_Calo_total->Fill(charge_calo);
                 Charge_Calo_crystal[crystal_id]->Fill(charge_calo);
                 // Charge_Calo_Module[ModuleID]->Fill(charge_calo);
-                hCalMapPos[ModuleID]->Fill(CaloPosition.X(), CaloPosition.Y());
-                double valueToSet = (crystal_id == 0) ? 0.0001 : static_cast<double>(crystal_id);
-                hCalMapCrystalID[ModuleID]->SetBinContent(
-                    hCalMapCrystalID[ModuleID]->GetXaxis()->FindBin(CaloPosition.X()),
-                    hCalMapCrystalID[ModuleID]->GetYaxis()->FindBin(CaloPosition.Y()),
-                    valueToSet);
             }
         }
 
@@ -277,25 +300,35 @@ void AnalyzeCaloClusters(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
                     Int_t crystal_id = hit->GetCrystalId();
                     //cout << "crystal_id: " << crystal_id << endl;
                     Int_t ModuleID = crystal_id / kCrysPerModule;
-                    TVector3 CaloPosition = hit->GetPosition();
                     Double_t charge_clusterHit = hit->GetCharge();
-                    // if (crystal_id == 0) scatterPlot->SetPoint(pointIndex++, charge_cluster, nClusterHits);
                     if (charge_clusterHit > 0.02)
                     {
-                        ClusterCharge_Calo_crystal[crystal_id]->Fill(charge_clusterHit);
-                        if (calibCoeff.find(crystal_id) != calibCoeff.end())
+                        
+                        if (crystal_id == 1 || crystal_id == 6 || crystal_id == 0)
                         {
-                            Double_t charge_clusterHit_calibrated = charge_clusterHit / calibCoeff.at(crystal_id);
-                            ClusterCharge_Calo_Calibrated[crystal_id]->Fill(charge_clusterHit_calibrated);
+                            ClusterCharge_Calo_crystal[crystal_id]->Fill(charge_clusterHit);
+                            Double_t charge_clusterHit_calibrated;
+                            if (crystal_id == 1)
+                            {
+                                charge_clusterHit_calibrated = (1. / m_0_1) * (charge_clusterHit - q_0_1);
+                                ClusterCharge_Calo_Calibrated[crystal_id]->Fill(charge_clusterHit_calibrated);
+                            }
+                            else if (crystal_id == 6)
+                            {
+                                charge_clusterHit_calibrated = (1. / m_0_6) * (charge_clusterHit - q_0_6);
+                                ClusterCharge_Calo_Calibrated[crystal_id]->Fill(charge_clusterHit_calibrated);
+                            }
                         }
                     }
                 }
             }
+
             if (nClusterHits == 2 && nClusters == 1)
             {
                 //cout << "event: " << ev << " cluster size = 2" << endl;
                 std::vector<int> crystal_ids;
                 std::vector<double> charge_values;
+
                 Double_t charge_sum = 0;
                 Double_t charge_sum_calibrated = 0;
                 // the total charge of a cluster with size 2 is stored
@@ -303,6 +336,9 @@ void AnalyzeCaloClusters(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
                 bool isZero = false;
                 Double_t stored_charge = 0;
                 Double_t nonCalib_stored_charge = 0;
+                Double_t charge_0 = -100.;
+                Double_t charge_1 = -100.;
+                Double_t charge_6 = -100.;
                 for (int iclusterhit = 0; iclusterhit < nClusterHits; iclusterhit++)
                 {
                     TACAhit *hit = cluster->GetHit(iclusterhit);
@@ -316,53 +352,47 @@ void AnalyzeCaloClusters(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
                     if (crystal_id == 0 && charge_clusterHit > 0.02)
                     {
                         isZero = true;
+                        charge_0 = charge_clusterHit;
                         charge_sum_calibrated += charge_clusterHit;
                         charge_sum += charge_clusterHit;
+                        crystal_ids.push_back(0);
+                        charge_values.push_back(charge_0);
                     }
                     // The find() method returns an iterator to the matching element if found, or end() if not found.
-                    else if ((calibCoeff.find(crystal_id) != calibCoeff.end()) && charge_clusterHit > 0.02)
+                    else if ((crystal_id == 1 || crystal_id == 6) && charge_clusterHit > 0.02)
                     {
                         //cout << "crystal_id part of the calibration file" << endl;
                         //cout << "normalizing its charge to crystal 0.." << endl;
-                    
                         nonCalib_stored_charge += charge_clusterHit;
-                        charge_clusterHit = charge_clusterHit / calibCoeff.at(crystal_id);
+                        if (crystal_id == 1)
+                        {
+                            charge_1 = charge_clusterHit;
+                            crystal_ids.push_back(1);
+                            charge_values.push_back(charge_1);
+                            charge_clusterHit = (1. / m_0_1) * (charge_clusterHit - q_0_1);
+                        }
+                        else if (crystal_id == 6)
+                        {
+                            charge_6 = charge_clusterHit;
+                            crystal_ids.push_back(6);
+                            charge_values.push_back(charge_6);
+                            charge_clusterHit = (1. / m_0_6) * (charge_clusterHit - q_0_6);
+                        }
                         stored_charge += charge_clusterHit;
                     }
-                    else if (charge_clusterHit > 0.02)
-                    {
-                        cout << "crystal_id " << crystal_id << " not part of calibration file" << endl;
-                    }
-                    
-                    if (charge_clusterHit > 0.02)
-                    {
-                        crystal_ids.push_back(crystal_id);
-                        charge_values.push_back(charge_clusterHit);
-                    }
-
                 }
 
-                if (isZero)
+                if (crystal_ids.size() == 2 && isZero && (charge_1 != -100. || charge_6 != -100.))
                 {
-                    charge_sum_calibrated += stored_charge;
-                    charge_sum += nonCalib_stored_charge;
-
-                    Charge_Calo_nonCalibrated->Fill(charge_sum);
-                    Charge_Calo_Calibrated->Fill(charge_sum_calibrated);
-                }
-
-
-                if (crystal_ids.size() == 2)
-                {
-                    int id1 = crystal_ids[0], id2 = crystal_ids[1];
-                    double charge1 = charge_values[0], charge2 = charge_values[1];
+                    Int_t id1 = crystal_ids[0], id2 = crystal_ids[1];
+                    Double_t charge1 = charge_values[0], charge2 = charge_values[1];
 
                     //cout << "crystal_id1: " << id1 << " charge1: " << charge1 << endl;
                     //cout << "crystal_id2: " << id2 << " charge2: " << charge2 << endl;
 
                     // Ensure the pair is always stored in a consistent order
-                    std::pair<int, int> crystalPair;
-                    double chargeLower, chargeHigher;
+                    std::pair<Int_t, Int_t> crystalPair;
+                    Double_t chargeLower, chargeHigher;
 
                     if (id1 < id2)
                     {
@@ -377,9 +407,21 @@ void AnalyzeCaloClusters(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
                         chargeHigher = charge1;
                     }
 
-                    if (crystalPair.first < 9 && crystalPair.second < 9)
+                    if (crystalPair.first == 0 && (crystalPair.second == 1 || crystalPair.second == 6))
                     {
                         Correlated_ClusterCharge[crystalPair.first][crystalPair.second]->Fill(chargeLower, chargeHigher);
+
+                        if (crystalPair.first != 0) cout << "first crystal: " << crystalPair.first << endl;
+
+                        if (crystalPair.second == 1 && charge_6 != -100.)
+                        {
+                            cout << "2nd crystalID = 1, charge_1: " << charge_1 << " charge_6: " << charge_6 << endl;
+                        }
+                        else if (crystalPair.second == 6 && charge_1 != -100.)
+                        {
+                            cout << "2nd crystalID = 6, charge_1: " << charge_1 << " charge_6: " << charge_6 << endl;
+                        }
+
 
                         // Create scatter plot if it doesn't exist
                         if (scatterPlots.find(crystalPair) == scatterPlots.end())
@@ -392,13 +434,47 @@ void AnalyzeCaloClusters(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
                             scatterPlots[crystalPair]->SetMarkerSize(0.35); // Default is 1
                             scatterPlots[crystalPair]->SetMarkerColor(kBlue);
                             scatterPlots[crystalPair]->SetMinimum(0.);
-                            scatterPlots[crystalPair]->SetMaximum(0.55);
+                            scatterPlots[crystalPair]->SetMaximum(0.5);
                             scatterPlots[crystalPair]->SetLineStyle(0);
                             scatterPlots[crystalPair]->SetLineWidth(0);
                         }
 
                         // Add point to scatter plot
                         scatterPlots[crystalPair]->SetPoint(scatterPlots[crystalPair]->GetN(), chargeLower, chargeHigher);
+
+                        Double_t expected_charge_1 = m_0_1 * charge_0;
+                        Double_t expected_charge_1_intercalib = m_0_1_intercalib * charge_0;
+                        Double_t expected_charge_6 = m_0_6 * charge_0;
+                        Double_t expected_charge_6_intercalib = m_0_6_intercalib * charge_0;
+
+                        charge_sum_calibrated += stored_charge;
+                        charge_sum += nonCalib_stored_charge;
+
+                        Charge_Calo_nonCalibrated->Fill(charge_sum);
+                        Charge_Calo_Calibrated->Fill(charge_sum_calibrated);
+
+                        if (charge_1 != -100.)
+                        {
+                            Charge_Calo_Calibrated_q->Fill(charge_0);
+                            Charge_Calo_Calibrated_q_intercalib->Fill(charge_0);
+                            //Charge_Calo_Calibrated_q_0_1->Fill(charge_0);
+                            Charge_Calo_Calibrated_q_intercalib_0_1->Fill(charge_0);
+                            Charge_Calo_Calibrated_q->Fill(charge_1 - expected_charge_1);
+                            Charge_Calo_Calibrated_q_0_1->Fill(charge_0 - (charge_1 / m_0_1));
+                            Charge_Calo_Calibrated_q_intercalib->Fill(charge_1 - expected_charge_1_intercalib);
+                            Charge_Calo_Calibrated_q_intercalib_0_1->Fill(charge_1 - expected_charge_1_intercalib);
+                        }
+                        if (charge_6 != -100.)
+                        {
+                            Charge_Calo_Calibrated_q->Fill(charge_0);
+                            Charge_Calo_Calibrated_q_intercalib->Fill(charge_0);
+                            Charge_Calo_Calibrated_q->Fill(charge_6 - expected_charge_6);
+                            //Charge_Calo_Calibrated_q_0_6->Fill(charge_0);
+                            Charge_Calo_Calibrated_q_intercalib_0_6->Fill(charge_0);
+                            Charge_Calo_Calibrated_q_0_6->Fill(charge_0 - (charge_6 / m_0_6));
+                            Charge_Calo_Calibrated_q_intercalib->Fill(charge_6 - expected_charge_6_intercalib);
+                            Charge_Calo_Calibrated_q_intercalib_0_6->Fill(charge_6 - expected_charge_6_intercalib);
+                        }
                     }
                 }
             }
@@ -407,13 +483,6 @@ void AnalyzeCaloClusters(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
     // close for loop over events
     gTAGroot.EndEventLoop();
 
-    SetTitleAndLabels(MinCharge_ClusterSize, Form("Min. Charge vs Cluster Size @ %d MeV/u", energy), "Cluster Size", "Min.Charge [a.u.]");
-
-    for (int iclusterHit = 1; iclusterHit < 7; iclusterHit++)
-    {
-        SetTitleAndLabels(minCharge[iclusterHit], Form("Min. Charge Cluster Size %d @ %d MeV/u", iclusterHit, energy), "Min.Charge", "");
-    }
-
     SetTitleAndLabels(Charge_Calo_Calibrated, Form("Charge Calo Calibrated (single cluster of size 2) @ %d MeV/u", energy), "Charge [a.u.]", "");
     SetTitleAndLabels(Charge_Calo_nonCalibrated, Form("Non Calibrated Charge Calo (single cluster of size 2) @ %d MeV/u", energy), "Charge [a.u.]", "");
 
@@ -421,12 +490,10 @@ void AnalyzeCaloClusters(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
          << "Job Done!" << endl;
 
     fout->cd();
-
     for (auto &entry : scatterPlots)
     {
         entry.second->Write();
     }
-
     fout->Write();
     fout->Close();
 
@@ -434,6 +501,50 @@ void AnalyzeCaloClusters(TString infile = "testMC.root", Bool_t isMax = kFALSE, 
 }
 
 //-----------------------------------------------------------------------------
+// Function to fit scatter plots and return fit results
+std::pair<FitResult, TGraph*> FitScatterPlot(TGraph *graph, Int_t i, Int_t j, Double_t maxX, Double_t maxY, Double_t energy)
+{
+    FitResult result = {false, 0.0, 0.0, 0.0, 0.0};
+
+    if (!graph)
+        return {result, nullptr};
+
+    std::vector<Double_t> xFiltered, yFiltered;
+
+    // Threhsold to select the points between the two parallel lines
+    // with slope -(maxY / maxX) with maximum y value: maxY +- line_threhsold 
+    Double_t line_threshold = (energy == 200 || energy == 220) ? 0.02 : 0.01;
+
+    for (int i = 0; i < graph->GetN(); ++i) {
+        Double_t x, y;
+        graph->GetPoint(i, x, y);
+
+        // Apply selection condition
+        if ((y > (maxY - line_threshold - x * (maxY / maxX)) && y < (maxY + 2*line_threshold - x * (maxY/ maxX))) && (y > 0.02)) {
+            xFiltered.push_back(x);
+            yFiltered.push_back(y);
+        }
+    }
+    // Create a new graph with filtered points
+    TGraph *filteredGraph = new TGraph(xFiltered.size(), xFiltered.data(), yFiltered.data());
+
+    cout << "Intercept init. value: " << maxY << " Slope init. value: " << ((maxX != 0) ? -maxY / maxX : 0) << endl;
+
+    // Define a linear fit function
+    TF1 *fitFunc = new TF1(Form("fit_Crystal%d_vs_Crystal%d", i, j), "[0] + [1]*x", 0., maxX);
+    fitFunc->SetParameter(0, maxY);
+    fitFunc->SetParameter(1, (maxX != 0) ? -maxY / maxX : 0);
+    filteredGraph->Fit(fitFunc, "QWR"); // "Q" for quiet mode
+
+    result.success = true;
+    result.p0 = fitFunc->GetParameter(0);
+    result.p1 = fitFunc->GetParameter(1);
+    result.p0err = fitFunc->GetParError(0);
+    result.p1err = fitFunc->GetParError(1);
+
+    return {result, filteredGraph};
+}
+
 void InitializeContainers()
 {
 
@@ -521,6 +632,14 @@ void BookHistograms()
     Charge_Calo_Calibrated = new TH1D(Form("Charge_Calo_Calibrated"), Form("Charge Calo Calibrated (single cluster of size 2)"), 500, -0.2, 1.5);
     Charge_Calo_nonCalibrated = new TH1D(Form("Charge_Calo_nonCalibrated"), Form("Non-Calibrated Charge Calo (single cluster of size 2)"), 500, -0.2, 1.5);
 
+    Charge_Calo_Calibrated_q = new TH1D(Form("Charge_Calo_Calibrated_q"), Form("Charge Calo Calibrated Intercept (single cluster of size 2)"), 500, -0.2, 1.5);
+    Charge_Calo_Calibrated_q_intercalib = new TH1D(Form("Charge_Calo_Calibrated_q_intercalib"), Form("Charge Calo Calibrated Intercept Intercalib. (single cluster of size 2)"), 500, -0.2, 1.5);
+
+    Charge_Calo_Calibrated_q_0_1 = new TH1D(Form("Charge_Calo_Calibrated_q_0_1"), Form("Charge Calo Calibrated Crystal 0 vs 1 Intercept (single cluster of size 2)"), 500, -0.2, 0.5);
+    Charge_Calo_Calibrated_q_0_6 = new TH1D(Form("Charge_Calo_Calibrated_q_0_6"), Form("Charge Calo Calibrated Crystal 0 vs 6 Intercept (single cluster of size 2)"), 500, -0.2, 0.5);
+
+    Charge_Calo_Calibrated_q_intercalib_0_1 = new TH1D(Form("Charge_Calo_Calibrated_q_intercalib_0_1"), Form("Charge Calo Calibrated Crystal 0 vs 1 Intercept Intercalib. (single cluster of size 2)"), 500, -0.2, 1.5);
+    Charge_Calo_Calibrated_q_intercalib_0_6 = new TH1D(Form("Charge_Calo_Calibrated_q_intercalib_0_6"), Form("Charge Calo Calibrated Crystal 0 vs 6 Intercept Intercalib. (single cluster of size 2)"), 500, -0.2, 1.5);
 
     Clusters_number = new TH1D(Form("Clusters_number"), Form("Clusters_number"), 100, -1., 5.);
     Clusters_size_noCuts = new TH1D(Form("noCuts_Clusters_size"), Form("No Cuts Clusters_size"), 100, -1., 20.);
@@ -531,12 +650,14 @@ void BookHistograms()
         minCharge[iclusterHit] = new TH1D(Form("MinCharge_ClusterSize_%d", iclusterHit), Form("Min. Charge Cluster Size %d", iclusterHit), 220, -0.5, 1.5);
     }
     MinCharge_ClusterSize = new TH2D(Form("h2D_MinCharge_ClusterSize"), Form("Min.Charge vs Cluster Size"), 100, 0, 6, 220, -0.5, 1.5);
+
     // Correlated charge for cluster-size = 2, for the central module (ids from 0 to 8)
     for (int icrystal_x = 0; icrystal_x < kCrysPerModule; icrystal_x++)
     {
         for (int icrystal_y = icrystal_x + 1; icrystal_y < kCrysPerModule; icrystal_y++)
         {
             Correlated_ClusterCharge[icrystal_x][icrystal_y] = new TH2D(Form("Correlated_ClusterCharge_ids_%d_%d", icrystal_x, icrystal_y), Form("Cluster Size 2: Charge crystalID %d vs crystalID %d", icrystal_x, icrystal_y), 200, 0., 0.55, 200, 0., 0.55);
+            //Correlated_ClusterCharge[icrystal_x][icrystal_y] = new TH2D(Form("Correlated_ClusterCharge_ids_%d_%d", icrystal_x, icrystal_y), Form("Cluster Size 2: Charge crystalID %d vs crystalID %d", icrystal_x, icrystal_y), 100, 0., 0.55, 100, 0., 0.55);
         }
     }
 
@@ -546,15 +667,12 @@ void BookHistograms()
         Charge_Calo_crystal_noCuts[icrystal] = new TH1D(Form("noCuts_Charge_Calo_crystalId_%d", icrystal), Form("No Cuts Charge Calo crystalID %d", icrystal), 500, -0.2, 1.);
 
         // hClusterSize_Charge[icrystal] = new TH2D(Form("ClusterSize_Charge_crystalId_%d", icrystal), Form("Cluster-Size vs Norm.Charge crystalId %d", icrystal), 100, -0.2, 1.1, 30, 0.5, 6.5);
-        ClusterCharge_Calo_crystal[icrystal] = new TH1D(Form("ClusterCharge_Calo_crystalId_%d", icrystal), Form("Cluster Size 1: Charge crystalID %d", icrystal), 500, -0.2, 1.1);
-        if (calibCoeff.find(icrystal) != calibCoeff.end())
-            ClusterCharge_Calo_Calibrated[icrystal] = new TH1D(Form("Calibrated_ClusterCharge_Calo_crystalId_%d", icrystal), Form("Cluster Size 1: Calibrated Charge crystalID %d", icrystal), 500, -0.2, 1.1);
-    }
-    for (int imodule = 0; imodule < kModules; imodule++)
-    {
-        hCalMapPos[imodule] = new TH2D(Form("hCalMapPos_module_%d", modules[imodule]), Form("hCalMapPos_module_%d", modules[imodule]), 27, -27., 27., 11, -11., 11.);
-        hCalMapCrystalID[imodule] = new TH2D(Form("hCalMapCrystalID_module_%d", modules[imodule]), Form("hCalMapCrystalID_module_%d", modules[imodule]), 27, -27., 27., 11, -11., 11.);
-        // Charge_Calo_Module[imodule] = new TH1D(Form("Charge_Calo_Module_%d", modules[imodule]), Form("Charge_Calo_Module_%d", modules[imodule]), 200, 0., 1.);
+        if (icrystal == 0 || icrystal == 1 || icrystal == 6)
+        {
+            ClusterCharge_Calo_crystal[icrystal] = new TH1D(Form("ClusterCharge_Calo_crystalId_%d", icrystal), Form("Single Cluster of Size 1: Non-Calibrated Charge crystalID %d", icrystal), 500, -0.2, 1.1);
+            if (icrystal == 1 || icrystal == 6)
+                ClusterCharge_Calo_Calibrated[icrystal] = new TH1D(Form("Calibrated_ClusterCharge_Calo_crystalId_%d", icrystal), Form("Single Cluster of Size 1: Calibrated Charge crystalID %d", icrystal), 500, -0.2, 1.1);
+        }
     }
 
     return;
